@@ -5,7 +5,8 @@
 /* The first screen: a few words on the left, and the map takes the rest. */
 .hero {
   display: grid;
-  grid-template-columns: minmax(280px, 0.5fr) minmax(0, 2fr);
+  /* The left column is at least as wide as its longest line, so the caption never wraps. */
+  grid-template-columns: minmax(max-content, 0.5fr) minmax(0, 2fr);
   gap: 48px;
   align-items: center;
   min-height: 100dvh;
@@ -58,6 +59,14 @@ h1 {
 .figures .main dt {
   margin-top: 8px;
   font-size: 17px;
+  white-space: nowrap;
+}
+
+/* The narrowest phones have no room for it on one line. */
+@media (max-width: 380px) {
+  .figures .main dt {
+    white-space: normal;
+  }
 }
 
 /* An underline marks the link without relying on colour. */
