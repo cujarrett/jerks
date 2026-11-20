@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The Launchpad mark in the red of the map. A tab bar can be light or dark, so each gets its own pair. -->
+  <style>
+    .bracket { fill: none; stroke: #ff8fa3; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+    .arrow { fill: #d70f3c; }
+    @media (prefers-color-scheme: dark) {
+      .bracket { stroke: #ff375f; }
+      .arrow { fill: #ffd0d8; }
+    }
+  </style>
+  <path class="bracket" d="M19 10 H6 V54 H19" />
+  <path class="bracket" d="M45 10 H58 V54 H45" />
+  <path class="arrow" d="M32 16.5 L45.5 32 H18.5 Z" />
+  <rect class="arrow" x="27.5" y="29" width="9" height="22" rx="4.5" />
+</svg>

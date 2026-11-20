@@ -1,0 +1,82 @@
+<main>
+  <section class="hero">
+    <div class="intro">
+      <h1>Jerks.</h1>
+
+      <dl class="figures">
+        @if (data(); as d) {
+          <div class="main">
+            <dd>{{ count() | number }}</dd>
+            <dt>attacks in the last 30 days</dt>
+          </div>
+          <div>
+            <dd>{{ d.sources | number }}</dd>
+            <dt>sources</dt>
+          </div>
+          <div>
+            <dd>{{ d.places.length | number }}</dd>
+            <dt>cities</dt>
+          </div>
+        } @else {
+          <div class="main">
+            <dd>–</dd>
+            <dt>{{ failed() ? 'Live stats are unavailable right now' : 'attacks' }}</dt>
+          </div>
+        }
+      </dl>
+    </div>
+
+    <div class="stage">
+      <svg class="map" [attr.viewBox]="viewBox" role="img" [attr.aria-label]="summary()">
+        <path class="land" [attr.d]="land" />
+        <path class="borders" [attr.d]="borders" />
+        <g class="dots">
+          @for (d of dots(); track d.name) {
+            <circle [attr.cx]="d.x" [attr.cy]="d.y" [attr.r]="d.r">
+              <title>{{ d.title }}</title>
+            </circle>
+          }
+        </g>
+        @for (p of pings(); track p.id) {
+          <circle
+            class="flash"
+            [attr.cx]="p.x"
+            [attr.cy]="p.y"
+            [attr.r]="p.r"
+            [style.--heat]="p.heat"
+          />
+          <circle class="ring" [attr.cx]="p.x" [attr.cy]="p.y" [attr.r]="p.r" />
+        }
+      </svg>
+
+      <div class="scrubber" aria-hidden="true"><i [style.width.%]="progress()"></i></div>
+      <div class="under">
+        <app-live-source [updatedAt]="updatedAt()" [failed]="failed()" />
+        <span class="day">{{ day() }}</span>
+      </div>
+    </div>
+  </section>
+
+  @if (data()) {
+    <section class="card">
+      <h2>Biggest jerks.</h2>
+      <p>Mostly data centers. Nothing personal, {{ worstCity() }}.</p>
+      <ol>
+        @for (c of worst(); track c.name) {
+          <li>
+            <span>{{ c.name }}</span><b>{{ c.count | number }}</b>
+          </li>
+        }
+      </ol>
+    </section>
+  }
+
+  <footer>
+    <p>
+      Read from the Traefik access logs on my bookshelf homelab. US sources only, shown by city.
+    </p>
+    <a href="https://mattjarrett.dev/#homelab" target="_blank" rel="noopener noreferrer"
+      >mattjarrett.dev<span aria-hidden="true"> ↗</span></a
+    >
+  </footer>
+</main>

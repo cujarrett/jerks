@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+  build:
+    needs: lint-and-test
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    # A pull request builds the image as a check and pushes nothing.
+    uses: cujarrett/homelab/.github/workflows/build-image.yml@main
+    with:
+      image: ghcr.io/cujarrett/jerks
+      tags: |
+        ghcr.io/cujarrett/jerks:sha-${{ github.sha }}
+        ghcr.io/cujarrett/jerks:latest
+      cache-scope: jerks
+      check-only: ${{ github.event_name == 'pull_request' }}
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: cujarrett/homelab-workspaces/.github/workflows/update-image-tag.yml@main
+    with:
+      # The Spa lives in the mattjarrett-dev workspace, beside the homelab-stats it reads.
+      file: mattjarrett-dev/jerks.yaml
+    secrets:
+      app_private_key: ${{ secrets.HOMELAB_WORKSPACES_APP_KEY }}

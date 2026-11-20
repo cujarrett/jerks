@@ -1,0 +1,275 @@
+:host {
+  display: block;
+}
+
+/* The first screen: a few words on the left, and the map takes the rest. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.5fr) minmax(0, 2fr);
+  gap: 48px;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 40px max(22px, 4vw);
+  /* A faint warm light behind the map. */
+  background: radial-gradient(50% 55% at 66% 46%, rgba(255, 55, 95, 0.1), transparent);
+}
+
+h1 {
+  font-size: clamp(56px, 6.5vw, 96px);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+/* One big figure, then two small ones side by side. */
+.figures {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 22px 36px;
+  margin-top: clamp(36px, 7vh, 72px);
+}
+
+.figures .main {
+  grid-column: 1 / -1;
+}
+
+.figures dd {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.figures .main dd {
+  font-size: clamp(64px, 6.5vw, 96px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  color: var(--accent);
+}
+
+.figures dt {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.figures .main dt {
+  margin-top: 8px;
+  font-size: 17px;
+}
+
+.stage {
+  min-width: 0;
+}
+
+/* The map takes the height the screen has left, so the first screen never scrolls. */
+.map {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: max(260px, calc(100dvh - 150px));
+  overflow: visible;
+}
+
+.land {
+  fill: #1c1c1e;
+}
+
+/* Non-scaling keeps state lines a hairline at any map size. */
+.borders {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* One soft glow for all the dots, set on their group so it is drawn once. */
+.dots {
+  filter: drop-shadow(0 0 10px rgba(255, 55, 95, 0.45));
+}
+
+/* A city at rest is a dim red, so a hit has somewhere to go. */
+.dots circle {
+  fill: var(--accent);
+  fill-opacity: 0.38;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: r 0.3s ease-out;
+  animation: pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) backwards;
+}
+
+/* A hit turns the whole dot white hot, then it cools back to its resting red.
+   A city hit in bucket after bucket gets a new flash each time, so it stays lit. */
+.flash {
+  fill: #fff5f6;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+  animation: flash 1.1s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+
+/* A ring spreads from the dot on the same hit. */
+.ring {
+  fill: none;
+  stroke: #ff8fa3;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+  animation: ripple 1.1s ease-out forwards;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0);
+  }
+}
+
+/* White first, then the accent red, then gone. --heat is how bright it starts. */
+@keyframes flash {
+  from {
+    fill: #fff5f6;
+    opacity: var(--heat, 1);
+    transform: scale(1.18);
+  }
+  35% {
+    fill: var(--accent);
+    opacity: calc(var(--heat, 1) * 0.85);
+    transform: scale(1);
+  }
+  to {
+    fill: var(--accent);
+    opacity: 0;
+  }
+}
+
+@keyframes ripple {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+/* A hairline that fills as the 30 days play, then starts over. */
+.scrubber {
+  height: 2px;
+  margin-top: 18px;
+  border-radius: 1px;
+  background: var(--line);
+}
+
+.scrubber i {
+  display: block;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--ink);
+  transition: width 0.14s linear;
+}
+
+.under {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.day {
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  max-width: 560px;
+  margin: 24px auto 96px;
+  padding: clamp(28px, 3.4vw, 44px);
+  border-radius: 28px;
+  background: var(--card);
+}
+
+/* On a phone the card keeps the page's side margin. */
+@media (max-width: 604px) {
+  .card {
+    margin-inline: 22px;
+  }
+}
+
+h2 {
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.card p {
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+ol {
+  margin-top: 24px;
+  list-style: none;
+}
+
+li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+  font-size: 17px;
+}
+
+li b {
+  font-weight: 400;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+footer {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 18px max(22px, 4vw) 40px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+footer a {
+  color: var(--ink);
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    align-content: center;
+  }
+
+  .figures {
+    margin-top: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots circle,
+  .flash,
+  .ring {
+    animation: none;
+    transition: none;
+  }
+}
