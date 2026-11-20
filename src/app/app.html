@@ -7,7 +7,16 @@
         @if (data(); as d) {
           <div class="main">
             <dd>{{ count() | number }}</dd>
-            <dt>attacks in the last 30 days</dt>
+            <dt>
+              attacks on my
+              <a
+                href="https://blog.mattjarrett.dev/homelab/"
+                target="_blank"
+                rel="noopener noreferrer"
+                >homelab</a
+              >
+              in the last 30 days
+            </dt>
           </div>
           <div>
             <dd>{{ d.sources | number }}</dd>

@@ -60,6 +60,18 @@ h1 {
   font-size: 17px;
 }
 
+/* An underline marks the link without relying on colour. */
+.figures a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--ink-2);
+  text-underline-offset: 3px;
+}
+
+.figures a:hover {
+  text-decoration-color: var(--ink);
+}
+
 .stage {
   min-width: 0;
 }

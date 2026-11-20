@@ -45,7 +45,13 @@ describe('App', () => {
     motion(true)
     const el = (await mount()).nativeElement as HTMLElement
     expect(el.querySelector('.figures .main dd')?.textContent).toBe('12')
-    expect(el.textContent).toContain('attacks in the last 30 days')
+    const caption = el.querySelector('.figures .main dt')
+    expect(caption?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'attacks on my homelab in the last 30 days',
+    )
+    expect(caption?.querySelector('a')?.getAttribute('href')).toBe(
+      'https://blog.mattjarrett.dev/homelab/',
+    )
     // Honolulu is off the lower-48 map.
     const titles = [...el.querySelectorAll('.dots circle title')].map((t) => t.textContent)
     expect(titles).toEqual(['Boston, MA: 9 requests', 'Dallas, TX: 2 requests'])
