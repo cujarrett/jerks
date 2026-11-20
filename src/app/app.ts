@@ -19,6 +19,24 @@ const FRAME_MS = 140
 const PING_FRAMES = 9
 // homelab-stats rebuilds its answer every five minutes.
 const REFRESH_MS = 5 * 60_000
+// The count holds back its last attacks and adds them one at a time, like a live feed.
+// Each one flashes its city, so the map moves only when the number does.
+// HELD_BACK: at most this many, and never more than a tenth of the total.
+// TRICKLE_MS: the average gap between two of them, so a hundred take about 75 seconds.
+const HELD_BACK = 100
+const TRICKLE_MS = 750
+
+// Plain words for each kind of file homelab-stats sorts a request into.
+// Written to sit mid-sentence. The list capitalises the first letter in CSS.
+const KINDS: Record<string, string> = {
+  env: 'passwords in .env files',
+  wordpress: 'WordPress logins',
+  php: 'PHP admin pages',
+  git: 'source code in .git',
+  keys: 'cloud and SSH keys',
+  backup: 'database backups',
+  other: 'other hidden files',
+}
 
 interface Ping {
   id: number
@@ -45,10 +63,9 @@ export class App {
   protected readonly data = signal<AttackStats | null>(null)
   protected readonly failed = signal(false)
   protected readonly updatedAt = signal<number | null>(null)
-  // Frames played since the page opened. It keeps counting, so the sweep never stops.
-  // First sweep: dots play in. Every sweep after: the map stays full and cities ping as their bucket passes.
+  // Buckets played so far. The sweep runs once, from 30 days ago to now, and stops.
   protected readonly tick = signal(0)
-  // One flash and one ring per city that sent requests in the bucket under the playhead.
+  // One flash and one ring per city, for each bucket of the sweep and then for each attack that arrives.
   protected readonly pings = signal<Ping[]>([])
 
   protected readonly viewBox = `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`
@@ -57,14 +74,11 @@ export class App {
 
   private readonly buckets = computed(() => this.data()?.timestamps.length ?? 0)
 
-  // Buckets on the map so far. It stops at the bucket count when the first sweep ends.
+  // Buckets on the map so far.
   private readonly shown = computed(() => Math.min(this.tick(), this.buckets()))
 
-  // The bucket under the playhead, or -1 before the first frame.
-  private readonly playhead = computed(() => {
-    const n = this.buckets()
-    return n === 0 || this.tick() === 0 ? -1 : (this.tick() - 1) % n
-  })
+  // The bucket under the playhead, or -1 before the first frame. It rests on the newest one.
+  private readonly playhead = computed(() => this.shown() - 1)
 
   // How far the playhead is through the 30 days, as a percentage.
   protected readonly progress = computed(() => {
@@ -108,16 +122,45 @@ export class App {
 
   protected readonly dots = computed(() => {
     const f = this.shown()
+    const all = this.seriesUpTo()[f] || 1
+    const times = this.data()?.timestamps ?? []
     return this.placed()
       .filter((p) => p.upTo[f] > 0)
-      .map((p) => ({
-        name: `${p.city}, ${p.region}`,
-        x: p.x,
-        y: p.y,
-        r: p.radius(p.upTo[f]),
-        title: `${p.city}, ${p.region}: ${p.upTo[f].toLocaleString('en-US')} requests`,
-      }))
+      .map((p) => {
+        const count = p.upTo[f]
+        // The newest bucket on the map so far in which this city sent anything.
+        let last = f
+        while (last > 1 && p.upTo[last] === p.upTo[last - 1]) last--
+        const day = new Date(times[last - 1] * 1000).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        })
+        const share = Math.round((count / all) * 100)
+        return {
+          name: `${p.city}, ${p.region}`,
+          x: p.x,
+          y: p.y,
+          r: p.radius(count),
+          detail: `${count.toLocaleString('en-US')} ${count === 1 ? 'attack' : 'attacks'} · ${share < 1 ? 'under 1' : share}% of all · last on ${day}`,
+        }
+      })
   })
+
+  // The dot under the pointer, and where on the screen its label goes.
+  protected readonly hovered = signal<{ name: string; left: number; top: number } | null>(null)
+
+  // The label reads the dot's live numbers, so it keeps up while the count moves.
+  protected readonly tip = computed(() => {
+    const h = this.hovered()
+    const dot = h && this.dots().find((d) => d.name === h.name)
+    return h && dot ? { ...h, detail: dot.detail } : null
+  })
+
+  // The label is placed from the dot's own box on screen, so it lands right at any map size.
+  protected point(name: string, event: Event) {
+    const box = (event.currentTarget as Element).getBoundingClientRect()
+    this.hovered.set({ name, left: box.left + box.width / 2, top: box.top })
+  }
 
   // The five busiest cities, counting up with the first sweep.
   protected readonly worst = computed(() => {
@@ -127,7 +170,19 @@ export class App {
       .map((p) => ({ name: `${p.city}, ${p.region}`, count: p.upTo[f] }))
   })
 
-  protected readonly worstCity = computed(() => this.placed()[0]?.city ?? '')
+  // What they asked for, as a share of every attack. A kind this page has no words for is left out.
+  protected readonly kinds = computed(() => {
+    const d = this.data()
+    if (!d?.kinds || d.probes === 0) return []
+    return d.kinds
+      .filter((k) => KINDS[k.kind])
+      .slice(0, 5)
+      .map((k) => ({
+        kind: k.kind,
+        label: KINDS[k.kind],
+        share: Math.round((k.count / d.probes) * 100),
+      }))
+  })
 
   private readonly seriesUpTo = computed(() => {
     const d = this.data()
@@ -139,7 +194,13 @@ export class App {
       : [0]
   })
 
-  protected readonly count = computed(() => this.seriesUpTo()[this.shown()] ?? 0)
+  // Attacks the count still owes. It never shows more than the real total.
+  private readonly owed = signal(0)
+
+  protected readonly count = computed(() => {
+    const totals = this.seriesUpTo()
+    return Math.min(totals[this.shown()] ?? 0, totals[totals.length - 1] - this.owed())
+  })
 
   protected readonly summary = computed(() => {
     const d = this.data()
@@ -149,6 +210,11 @@ export class App {
 
   private fetched = 0
   private nextId = 0
+  // Counts every frame, so a ping knows when its second is up.
+  private frame = 0
+  // The cities of the attacks still owed, in the order they will arrive.
+  // Shorter than `owed` when some attacks had no location.
+  private queue: Point[] = []
   private timer: ReturnType<typeof setInterval> | undefined
 
   constructor() {
@@ -162,35 +228,85 @@ export class App {
         this.tick.set(this.buckets())
         return
       }
+      const total = this.data()?.probes ?? 0
+      this.owed.set(Math.min(HELD_BACK, Math.floor(total / 10)))
+      this.queue = this.newest(this.owed())
       this.timer = setInterval(() => this.step(), FRAME_MS)
     })
   }
 
   private step() {
-    // A hidden tab keeps its place, so the sweep picks up where the reader left it.
-    if (this.buckets() === 0 || this.document.visibilityState !== 'visible') return
-    const t = this.tick() + 1
-    this.tick.set(t)
-    const i = this.playhead()
+    // A hidden tab keeps its place, so nothing arrives while nobody is looking.
+    const n = this.buckets()
+    if (n === 0 || this.document.visibilityState !== 'visible') return
+    const now = ++this.frame
     const born: Ping[] = []
-    for (const p of this.placed()) {
-      const requests = p.upTo[i + 1] - p.upTo[i]
-      if (requests <= 0) continue
-      const heat = Math.min(1, 0.5 + Math.log10(requests) / 6)
-      born.push({ id: this.nextId++, x: p.x, y: p.y, r: p.radius(p.upTo[i + 1]), heat, born: t })
+    if (this.tick() < n) {
+      // The sweep. Every city that sent requests in this bucket flashes once.
+      const i = this.tick()
+      this.tick.set(i + 1)
+      for (const p of this.placed()) {
+        const requests = p.upTo[i + 1] - p.upTo[i]
+        if (requests <= 0) continue
+        const heat = Math.min(1, 0.5 + Math.log10(requests) / 6)
+        born.push({
+          id: this.nextId++,
+          x: p.x,
+          y: p.y,
+          r: p.radius(p.upTo[i + 1]),
+          heat,
+          born: now,
+        })
+      }
+    } else {
+      // After the sweep. One attack arrives at a time, at uneven gaps, and only its city flashes.
+      if (this.owed() > 0 && Math.random() < FRAME_MS / TRICKLE_MS) {
+        this.owed.update((count) => count - 1)
+        const at = this.queue.shift()
+        if (at) born.push({ id: this.nextId++, ...at, heat: 0.85, born: now })
+      }
+      // A page left open stays live.
+      if (Date.now() - this.fetched >= REFRESH_MS) this.load()
     }
-    this.pings.update((live) => [...live.filter((p) => t - p.born < PING_FRAMES), ...born])
-    // A page left open stays live. The new numbers arrive between two sweeps.
-    if (i === this.buckets() - 1 && Date.now() - this.fetched >= REFRESH_MS) this.load()
+    this.pings.update((live) => {
+      const kept = live.filter((p) => now - p.born < PING_FRAMES)
+      return born.length || kept.length !== live.length ? [...kept, ...born] : live
+    })
+  }
+
+  // Where the newest `count` attacks came from, oldest first.
+  private newest(count: number): Point[] {
+    const found: Point[] = []
+    for (let b = this.buckets() - 1; b >= 0 && found.length < count; b--) {
+      const bucket: Point[] = []
+      for (const p of this.placed()) {
+        const at = { x: p.x, y: p.y, r: p.radius(p.total) }
+        for (let k = p.upTo[b + 1] - p.upTo[b]; k > 0; k--) bucket.push(at)
+      }
+      // The API counts per 12 hours, so the order inside one bucket is made up.
+      found.unshift(...shuffle(bucket).slice(0, count - found.length))
+    }
+    return found
   }
 
   private async load() {
     this.fetched = Date.now()
     try {
       const { data, at } = await this.stats.attacks()
+      const first = this.data() === null
+      const shownBefore = first ? data.probes : this.count()
+      const totalsBefore = new Map(this.placed().map((p) => [p.city + p.region, p.total]))
       this.data.set(data)
       this.updatedAt.set(at)
       this.failed.set(false)
+      // Attacks that arrived since the last fetch trickle in too. The count never jumps up.
+      this.owed.set(Math.min(HELD_BACK, Math.max(0, data.probes - shownBefore)))
+      if (first) return
+      const arrived = this.placed().flatMap((p) => {
+        const more = p.total - (totalsBefore.get(p.city + p.region) ?? 0)
+        return more > 0 ? new Array<Point>(more).fill({ x: p.x, y: p.y, r: p.radius(p.total) }) : []
+      })
+      this.queue = shuffle(arrived).slice(0, this.owed())
     } catch {
       this.failed.set(true)
     }
@@ -203,4 +319,20 @@ function runningTotal(buckets: number, hits: number[][]): number[] {
   for (const [i, count] of hits) if (i >= 0 && i < buckets) totals[i + 1] += count
   for (let f = 1; f <= buckets; f++) totals[f] += totals[f - 1]
   return totals
+}
+
+// Where a flash goes on the map, and how big.
+interface Point {
+  x: number
+  y: number
+  r: number
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items]
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[out[i], out[j]] = [out[j], out[i]]
+  }
+  return out
 }

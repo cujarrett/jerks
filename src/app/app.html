@@ -3,36 +3,37 @@
     <div class="intro">
       <h1>Jerks.</h1>
 
+      <!-- The same rows before and after the numbers arrive, so nothing on the page moves. -->
       <dl class="figures">
-        @if (data(); as d) {
-          <div class="main">
-            <dd>{{ count() | number }}</dd>
-            <dt>
-              attacks on my
-              <a
-                href="https://blog.mattjarrett.dev/homelab/"
-                target="_blank"
-                rel="noopener noreferrer"
-                >homelab</a
-              >
-              in the last 30 days
-            </dt>
-          </div>
-          <div>
-            <dd>{{ d.sources | number }}</dd>
-            <dt>sources</dt>
-          </div>
-          <div>
-            <dd>{{ d.places.length | number }}</dd>
-            <dt>cities</dt>
-          </div>
-        } @else {
-          <div class="main">
-            <dd>–</dd>
-            <dt>{{ failed() ? 'Live stats are unavailable right now' : 'attacks' }}</dt>
-          </div>
-        }
+        @let d = data();
+        <div class="main">
+          <dd>{{ d ? (count() | number) : '–' }}</dd>
+          <dt>
+            attacks on my
+            <a
+              href="https://blog.mattjarrett.dev/homelab/"
+              target="_blank"
+              rel="noopener noreferrer"
+              >homelab</a
+            >
+            in the last 30 days
+          </dt>
+        </div>
+        <div>
+          <dd>{{ d ? (d.sources | number) : '–' }}</dd>
+          <dt>sources</dt>
+        </div>
+        <div>
+          <dd>{{ d ? (d.places.length | number) : '–' }}</dd>
+          <dt>cities</dt>
+        </div>
       </dl>
+      <!-- Always there, so the line under it does not arrive with a jump. -->
+      <p class="most">
+        @if (kinds()[0]; as top) {
+          Most often after {{ top.label }}.
+        }
+      </p>
     </div>
 
     <div class="stage">
@@ -41,9 +42,15 @@
         <path class="borders" [attr.d]="borders" />
         <g class="dots">
           @for (d of dots(); track d.name) {
-            <circle [attr.cx]="d.x" [attr.cy]="d.y" [attr.r]="d.r">
-              <title>{{ d.title }}</title>
-            </circle>
+            <circle
+              role="img"
+              [attr.aria-label]="d.name + ': ' + d.detail"
+              [attr.cx]="d.x"
+              [attr.cy]="d.y"
+              [attr.r]="d.r"
+              (pointerenter)="point(d.name, $event)"
+              (pointerleave)="hovered.set(null)"
+            />
           }
         </g>
         @for (p of pings(); track p.id) {
@@ -58,6 +65,14 @@
         }
       </svg>
 
+      <!-- Shown the moment the pointer is on a dot. The browser's own tooltip waits a second. -->
+      @if (tip(); as t) {
+        <div class="tip" aria-hidden="true" [style.left.px]="t.left" [style.top.px]="t.top">
+          <b>{{ t.name }}</b>
+          <span>{{ t.detail }}</span>
+        </div>
+      }
+
       <div class="scrubber" aria-hidden="true"><i [style.width.%]="progress()"></i></div>
       <div class="under">
         <app-live-source [updatedAt]="updatedAt()" [failed]="failed()" />
@@ -67,16 +82,29 @@
   </section>
 
   @if (data()) {
-    <section class="card">
-      <h2>Biggest jerks.</h2>
-      <p>Mostly data centers. Nothing personal, {{ worstCity() }}.</p>
-      <ol>
-        @for (c of worst(); track c.name) {
-          <li>
-            <span>{{ c.name }}</span><b>{{ c.count | number }}</b>
-          </li>
-        }
-      </ol>
+    <section class="cards">
+      @if (kinds().length) {
+        <article>
+          <h2>What they wanted.</h2>
+          <ol>
+            @for (k of kinds(); track k.kind) {
+              <li>
+                <span>{{ k.label }}</span><b>{{ k.share }}%</b>
+              </li>
+            }
+          </ol>
+        </article>
+      }
+      <article>
+        <h2>Biggest jerks.</h2>
+        <ol>
+          @for (c of worst(); track c.name) {
+            <li>
+              <span>{{ c.name }}</span><b>{{ c.count | number }}</b>
+            </li>
+          }
+        </ol>
+      </article>
     </section>
   }
 

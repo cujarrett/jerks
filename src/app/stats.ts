@@ -9,6 +9,9 @@ export interface AttackStats {
   series: number[]
   // hits: pairs of bucket index and requests in that bucket.
   places: { city: string; region: string; lat: number; lon: number; hits: number[][] }[]
+  // Requests by the kind of file asked for, most asked first. The kinds are fixed words.
+  // Missing from an API that has not been updated yet.
+  kinds?: { kind: string; count: number }[]
 }
 
 // The numbers and when the API read them from their source, in milliseconds.

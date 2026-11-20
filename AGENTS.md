@@ -13,7 +13,7 @@ The numbers come from [homelab-stats](https://github.com/cujarrett/homelab-stats
 | File | Purpose |
 |------|---------|
 | `Dockerfile` | Multi-stage build: Angular CLI, then the `base-nginx` image |
-| `src/app/app.ts` | The page: the last 30 days, swept across the map on a loop that never stops |
+| `src/app/app.ts` | The page: the last 30 days play onto the map once, then each new attack flashes its city as the count ticks up |
 | `src/app/us-map.ts` | Lower-48 outline and the projection that places a city on it |
 | `src/app/stats.ts` | The one call to `/api/stats/attacks` |
 | `proxy.live.json`, `proxy.local.json` | Dev-server proxies for `/api/stats/`. `npm start` uses the live one, `npm run start:local` the local one |

@@ -14,9 +14,16 @@ const attacks: AttackStats = {
     { city: 'Boston', region: 'MA', lat: 42.4, lon: -71.1, hits: [[2, 9]] },
     { city: 'Honolulu', region: 'HI', lat: 21.3, lon: -157.9, hits: [[2, 0]] },
   ],
+  kinds: [
+    { kind: 'env', count: 6 },
+    { kind: 'git', count: 3 },
+    { kind: 'made-up', count: 1 },
+  ],
 }
 
-const fakeStats = { attacks: () => Promise.resolve({ data: attacks, at: Date.now() }) }
+// What the fake API answers with. A test can swap it, and it goes back after each one.
+let served = attacks
+const fakeStats = { attacks: () => Promise.resolve({ data: served, at: Date.now() }) }
 
 async function mount() {
   await TestBed.configureTestingModule({
@@ -37,6 +44,7 @@ describe('App', () => {
   }
 
   afterEach(() => {
+    served = attacks
     vi.restoreAllMocks()
     vi.useRealTimers()
   })
@@ -53,14 +61,19 @@ describe('App', () => {
       'https://blog.mattjarrett.dev/homelab/',
     )
     // Honolulu is off the lower-48 map.
-    const titles = [...el.querySelectorAll('.dots circle title')].map((t) => t.textContent)
-    expect(titles).toEqual(['Boston, MA: 9 requests', 'Dallas, TX: 2 requests'])
+    const names = [...el.querySelectorAll('.dots circle')].map((c) => c.getAttribute('aria-label'))
+    expect(names).toEqual([
+      'Boston, MA: 9 attacks · 75% of all · last on Jul 3',
+      'Dallas, TX: 2 attacks · 17% of all · last on Jul 1',
+    ])
     expect(el.querySelectorAll('circle.ring').length).toBe(0)
   })
 
-  it('plays the dots in, then keeps sweeping with the map full', async () => {
+  it('plays the dots in once, then moves the map only when the number moves', async () => {
     motion(false)
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    // Every frame may add a held-back attack, so the count is the same on every run.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
     const fixture = await mount()
     const el = fixture.nativeElement as HTMLElement
     const after = (frames: number) => {
@@ -71,24 +84,79 @@ describe('App', () => {
         dots: el.querySelectorAll('.dots circle').length,
         // Narrow no-break spaces in times become plain ones, which is how the test writes them.
         day: el.querySelector('.day')?.textContent?.replace(/\s/g, ' '),
+        rings: el.querySelectorAll('circle.ring').length,
       }
     }
-    expect(after(0)).toEqual({ count: '0', dots: 0, day: '' })
-    expect(after(1)).toEqual({ count: '3', dots: 1, day: 'July 1 at 12 PM' })
-    expect(after(2)).toEqual({ count: '12', dots: 2, day: 'July 3 at 12 PM' })
-    // The second sweep starts over at the first bucket, and Dallas pings again.
-    const rings = el.querySelectorAll('circle.ring').length
-    expect(after(1)).toEqual({ count: '12', dots: 2, day: 'July 1 at 12 PM' })
-    expect(el.querySelectorAll('circle.ring').length).toBe(rings + 1)
-    expect(el.querySelectorAll('circle.flash').length).toBe(rings + 1)
+    expect(after(0)).toEqual({ count: '0', dots: 0, day: '', rings: 0 })
+    expect(after(1)).toEqual({ count: '3', dots: 1, day: 'July 1 at 12 PM', rings: 1 })
+    // One of the 12 is held back until the sweep is over.
+    expect(after(2)).toEqual({ count: '11', dots: 2, day: 'July 3 at 12 PM', rings: 2 })
+    // It arrives, and its city flashes. The sweep does not start over.
+    expect(after(1)).toEqual({ count: '12', dots: 2, day: 'July 3 at 12 PM', rings: 3 })
+    // Nothing is owed now, so the map goes still once the last rings fade.
+    expect(after(12)).toEqual({ count: '12', dots: 2, day: 'July 3 at 12 PM', rings: 0 })
   })
 
-  it('names the busiest cities', async () => {
+  it('holds back the last attacks and adds them one at a time after the sweep', async () => {
+    motion(false)
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    // Every frame may add one. A real page waits a random number of frames between them.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    served = { ...attacks, probes: 30, series: [10, 10, 10] }
+    const fixture = await mount()
+    const el = fixture.nativeElement as HTMLElement
+    const count = (frames: number) => {
+      vi.advanceTimersByTime(frames * 140)
+      fixture.detectChanges()
+      return el.querySelector('.figures .main dd')?.textContent
+    }
+    // A tenth of 30 is held back, so the sweep ends 3 short.
+    expect(count(3)).toBe('27')
+    expect(count(1)).toBe('28')
+    expect(count(2)).toBe('30')
+    expect(count(5)).toBe('30')
+  })
+
+  it('says what they wanted in plain words, and names the busiest cities', async () => {
     motion(true)
     const el = (await mount()).nativeElement as HTMLElement
-    const rows = [...el.querySelectorAll('.card li')].map((li) => li.textContent?.trim())
-    expect(rows).toEqual(['Boston, MA9', 'Dallas, TX2'])
-    expect(el.textContent).toContain('Nothing personal, Boston.')
+    const rows = (card: number) =>
+      [...el.querySelectorAll(`.cards article:nth-of-type(${card}) li`)].map((li) =>
+        li.textContent?.trim(),
+      )
+    // A kind this page has no words for is left out.
+    expect(rows(1)).toEqual(['passwords in .env files50%', 'source code in .git25%'])
+    expect(rows(2)).toEqual(['Boston, MA9', 'Dallas, TX2'])
+    expect(el.querySelector('.most')?.textContent?.trim()).toBe(
+      'Most often after passwords in .env files.',
+    )
+  })
+
+  it('still works with an API that sends no kinds yet', async () => {
+    motion(true)
+    served = { ...attacks, kinds: undefined }
+    const el = (await mount()).nativeElement as HTMLElement
+    expect(el.querySelectorAll('.cards article').length).toBe(1)
+    expect(el.querySelector('.most')?.textContent?.trim()).toBe('')
+  })
+
+  it('labels a dot the moment the pointer is on it', async () => {
+    motion(true)
+    const fixture = await mount()
+    const el = fixture.nativeElement as HTMLElement
+    expect(el.querySelector('.tip')).toBeNull()
+
+    const boston = el.querySelector('.dots circle') as SVGCircleElement
+    boston.dispatchEvent(new Event('pointerenter'))
+    fixture.detectChanges()
+    expect(el.querySelector('.tip b')?.textContent).toBe('Boston, MA')
+    expect(el.querySelector('.tip span')?.textContent).toBe(
+      '9 attacks · 75% of all · last on Jul 3',
+    )
+
+    boston.dispatchEvent(new Event('pointerleave'))
+    fixture.detectChanges()
+    expect(el.querySelector('.tip')).toBeNull()
   })
 
   it('has no controls, and links back to the homelab it watches', async () => {

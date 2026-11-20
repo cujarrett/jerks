@@ -1,6 +1,6 @@
 # [https://jerks.mattjarrett.dev](https://jerks.mattjarrett.dev)
 
-Scanners ask every site on my bookshelf Kubernetes homelab for files like `/.env` and `/wp-login.php`. This page sweeps the last 30 days of their requests across a US map, one dot per city, on a loop.
+Scanners ask every site on my bookshelf Kubernetes homelab for files like `/.env` and `/wp-login.php`. This page plays the last 30 days of their requests onto a US map, one dot per city. Then each new attack flashes its city as the count ticks up.
 
 The numbers come from [homelab-stats](https://github.com/cujarrett/homelab-stats), which reads the Traefik access logs. Only US requests are kept, and a source is reported as a city.
 
