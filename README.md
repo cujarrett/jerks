@@ -29,4 +29,4 @@ npm run build   # production build in dist/
 
 ## Deployment
 
-Runs on the homelab cluster as a `Spa` in the `mattjarrett-dev` workspace. Image: `ghcr.io/cujarrett/jerks`. ARM64.
+Runs on the homelab cluster as a `Spa` in the `jerks` workspace. Image: `ghcr.io/cujarrett/jerks`. ARM64.

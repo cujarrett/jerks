@@ -57,8 +57,5 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: cujarrett/homelab-workspaces/.github/workflows/update-image-tag.yml@main
-    with:
-      # The Spa lives in the mattjarrett-dev workspace, beside the homelab-stats it reads.
-      file: mattjarrett-dev/jerks.yaml
     secrets:
       app_private_key: ${{ secrets.HOMELAB_WORKSPACES_APP_KEY }}

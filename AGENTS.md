@@ -4,7 +4,7 @@ A one-page Angular site at [jerks.mattjarrett.dev](https://jerks.mattjarrett.dev
 
 The numbers come from [homelab-stats](https://github.com/cujarrett/homelab-stats), which nginx proxies at `/api/stats/`.
 
-- **Namespace**: `mattjarrett-dev`. The Spa runs there because a Spa can only proxy to an Api in its own namespace.
+- **Namespace**: `jerks`. nginx proxies to `homelab-stats` in its own namespace.
 - **nginx config**: the homelab `Spa` composition generates it. This repo ships none.
 - **Angular instructions**: See [.github/instructions/angular.instructions.md](.github/instructions/angular.instructions.md)
 
