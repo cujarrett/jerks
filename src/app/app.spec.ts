@@ -67,6 +67,7 @@ describe('App', () => {
       'Dallas, TX: 2 attacks · 17% of all · last on Jul 1',
     ])
     expect(el.querySelectorAll('circle.ring').length).toBe(0)
+    expect(el.querySelector('.map .home')?.getAttribute('aria-label')).toBe("Matt's Homelab")
   })
 
   it('plays the dots in once, then moves the map only when the number moves', async () => {
@@ -77,24 +78,23 @@ describe('App', () => {
     const fixture = await mount()
     const el = fixture.nativeElement as HTMLElement
     const after = (frames: number) => {
-      vi.advanceTimersByTime(frames * 140)
+      vi.advanceTimersByTime(frames * 70)
       fixture.detectChanges()
       return {
         count: el.querySelector('.figures .main dd')?.textContent,
         dots: el.querySelectorAll('.dots circle').length,
-        // Narrow no-break spaces in times become plain ones, which is how the test writes them.
-        day: el.querySelector('.day')?.textContent?.replace(/\s/g, ' '),
+        day: el.querySelector('.day')?.textContent,
         rings: el.querySelectorAll('circle.ring').length,
       }
     }
     expect(after(0)).toEqual({ count: '0', dots: 0, day: '', rings: 0 })
-    expect(after(1)).toEqual({ count: '3', dots: 1, day: 'July 1 at 12 PM', rings: 1 })
+    expect(after(1)).toEqual({ count: '3', dots: 1, day: 'July 1', rings: 1 })
     // One of the 12 is held back until the sweep is over.
-    expect(after(2)).toEqual({ count: '11', dots: 2, day: 'July 3 at 12 PM', rings: 2 })
+    expect(after(2)).toEqual({ count: '11', dots: 2, day: 'Jul 1 to Jul 3', rings: 2 })
     // It arrives, and its city flashes. The sweep does not start over.
-    expect(after(1)).toEqual({ count: '12', dots: 2, day: 'July 3 at 12 PM', rings: 3 })
+    expect(after(1)).toEqual({ count: '12', dots: 2, day: 'Jul 1 to Jul 3', rings: 3 })
     // Nothing is owed now, so the map goes still once the last rings fade.
-    expect(after(12)).toEqual({ count: '12', dots: 2, day: 'July 3 at 12 PM', rings: 0 })
+    expect(after(20)).toEqual({ count: '12', dots: 2, day: 'Jul 1 to Jul 3', rings: 0 })
   })
 
   it('holds back the last attacks and adds them one at a time after the sweep', async () => {
@@ -106,7 +106,7 @@ describe('App', () => {
     const fixture = await mount()
     const el = fixture.nativeElement as HTMLElement
     const count = (frames: number) => {
-      vi.advanceTimersByTime(frames * 140)
+      vi.advanceTimersByTime(frames * 70)
       fixture.detectChanges()
       return el.querySelector('.figures .main dd')?.textContent
     }
@@ -125,11 +125,48 @@ describe('App', () => {
         li.textContent?.trim(),
       )
     // A kind this page has no words for is left out.
-    expect(rows(1)).toEqual(['passwords in .env files50%', 'source code in .git25%'])
+    expect(rows(1)).toEqual(['passwords in .env files60%', 'source code in .git30%'])
     expect(rows(2)).toEqual(['Boston, MA9', 'Dallas, TX2'])
-    expect(el.querySelector('.most')?.textContent?.trim()).toBe(
-      'Most often after passwords in .env files.',
-    )
+  })
+
+  it('draws a data centre as a ring, and leaves it out of the cities and the jerks', async () => {
+    motion(true)
+    served = {
+      ...attacks,
+      places: [
+        ...attacks.places,
+        { city: 'Ashburn', region: 'VA', lat: 39, lon: -77.5, edge: true, hits: [[1, 50]] },
+      ],
+    }
+    const el = (await mount()).nativeElement as HTMLElement
+    const edge = el.querySelector('.dots circle.edge')
+    expect(edge?.getAttribute('aria-label')).toMatch(/^Cloudflare in Ashburn, VA: 50 stopped here/)
+    expect(el.querySelectorAll('.dots circle:not(.edge)').length).toBe(2)
+    expect(el.querySelector('.map')?.getAttribute('aria-label')).toMatch(/^Map of the 3 US cities/)
+    const jerks = [...el.querySelectorAll('.cards article:nth-of-type(2) li span')]
+    expect(jerks.map((s) => s.textContent)).toEqual(['Boston, MA', 'Dallas, TX'])
+  })
+
+  it('shows one number in the hero, with an arrow to the cards below', async () => {
+    motion(true)
+    const el = (await mount()).nativeElement as HTMLElement
+    expect(el.querySelectorAll('.figures dd').length).toBe(1)
+    expect(el.querySelector('.cue')?.getAttribute('href')).toBe('#more')
+    expect(el.querySelector('#more')).not.toBeNull()
+  })
+
+  it('keys the rings under the map, and says the cards cover only what reached my homelab', async () => {
+    motion(true)
+    // With no count from Cloudflare the map has no rings, so there is nothing to explain.
+    expect((await mount()).nativeElement.querySelector('.reach')).toBeNull()
+
+    TestBed.resetTestingModule()
+    served = { ...attacks, walls: [{ wall: 'waf', count: 4 }] }
+    const el = (await mount()).nativeElement as HTMLElement
+    const text = (selector: string) =>
+      el.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim()
+    expect(text('.under .edge-note')).toBe('4 stopped by Cloudflare')
+    expect(text('.reach')).toBe('Of the 8 that reached my homelab.')
   })
 
   it('still works with an API that sends no kinds yet', async () => {
@@ -137,7 +174,6 @@ describe('App', () => {
     served = { ...attacks, kinds: undefined }
     const el = (await mount()).nativeElement as HTMLElement
     expect(el.querySelectorAll('.cards article').length).toBe(1)
-    expect(el.querySelector('.most')?.textContent?.trim()).toBe('')
   })
 
   it('labels a dot the moment the pointer is on it', async () => {
@@ -157,12 +193,20 @@ describe('App', () => {
     boston.dispatchEvent(new Event('pointerleave'))
     fixture.detectChanges()
     expect(el.querySelector('.tip')).toBeNull()
+
+    el.querySelector('.map .home')?.dispatchEvent(new Event('pointerenter'))
+    fixture.detectChanges()
+    expect(el.querySelector('.tip b')?.textContent).toBe("Matt's Homelab")
+    expect(el.querySelector('.tip span')).toBeNull()
   })
 
   it('has no controls, and links back to the homelab it watches', async () => {
     motion(true)
     const el = (await mount()).nativeElement as HTMLElement
     expect(el.querySelectorAll('button').length).toBe(0)
+    expect(el.querySelector('footer')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+      'Made by Matt Jarrett with ♥ and Kubernetes',
+    )
     expect(el.querySelector('footer a')?.getAttribute('href')).toBe(
       'https://mattjarrett.dev/#homelab',
     )

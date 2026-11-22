@@ -1,64 +1,61 @@
 <section class="card">
-  <header>
-    <h2>What stopped them.</h2>
-    <p>Each dot is an attack from the map. It asks a web server for a file and gets nothing.</p>
-  </header>
+  <h2>My Homelab Layers of defense.</h2>
 
   <svg
+    #rings
     class="rings"
     viewBox="-340 -340 680 680"
     role="img"
-    aria-label="Six rings of defense around the pod. The attacks stop at the fourth, the web server."
+    aria-label="Six rings of defense around the container. Most attacks stop at the fourth, the web server."
     [class.focus]="active()"
-    [style.--stop.px]="stopAt"
   >
-    @for (w of walls; track w.name) {
+    @for (w of walls(); track w.name) {
       <circle
         class="wall"
-        [class.stop]="w.stop"
+        [class.stop]="w.share > 0"
         [class.calm]="w.calm"
         [class.on]="active() === w.name"
+        [style.--heat]="w.share"
         [attr.r]="w.r"
         (pointerenter)="active.set(w.name)"
         (pointerleave)="active.set(null)"
       />
-      <text [class.stop]="w.stop" [class.on]="active() === w.name" [attr.y]="w.labelY">
+      <text [class.stop]="w.share > 0" [class.on]="active() === w.name" [attr.y]="w.labelY">
         {{ w.name }}
       </text>
     }
     <g class="shots" aria-hidden="true">
-      @for (s of shots(); track s.id) {
-        <g [attr.transform]="s.turn">
+      @for (s of shots(); track s.key) {
+        <g [attr.transform]="s.turn" [style.--stop.px]="s.stopAt">
           <circle class="shot" r="5" />
-          <circle class="spark" [attr.cx]="stopAt" r="5" />
+          <circle class="spark" [attr.cx]="s.stopAt" r="5" />
         </g>
       }
     </g>
   </svg>
 
-  <ol class="walls">
-    @for (w of walls; track w.name) {
+  <ol>
+    @for (w of walls(); track w.name) {
       <li
-        [class.stop]="w.stop"
+        [class.stop]="w.share > 0"
         [class.on]="active() === w.name"
         (pointerenter)="active.set(w.name)"
         (pointerleave)="active.set(null)"
       >
-        <b>{{ w.name }}</b>
-        <span>{{ w.does }}</span>
+        <div>
+          <span>{{ w.name }}</span><small>{{ w.tool }}</small>
+        </div>
+        <b>
+          @if (w.count !== null) {
+            <i>{{ w.count | number }}</i>
+          } @else if (w.none) {
+            0 stopped here
+          }
+        </b>
       </li>
     }
   </ol>
 
-  <div class="around">
-    <h3>Around all of it.</h3>
-    <ul>
-      @for (a of around; track a.name) {
-        <li>
-          <b>{{ a.name }}</b>
-          <span>{{ a.does }}</span>
-        </li>
-      }
-    </ul>
-  </div>
+  <!-- These three watch every wall, so they have no ring of their own. -->
+  <p class="plus">Plus signed images, patching and alerts.</p>
 </section>

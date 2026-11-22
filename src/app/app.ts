@@ -14,10 +14,10 @@ import { Defenses } from './defenses'
 import { LiveSource } from './live-source'
 import { BORDERS_PATH, LAND_PATH, MAP_HEIGHT, MAP_WIDTH, project } from './us-map'
 
-// One 12-hour bucket per frame, so a sweep of the 30 days takes about eight seconds.
-const FRAME_MS = 140
+// One 12-hour bucket per frame, so a sweep of the 30 days takes about four seconds.
+const FRAME_MS = 70
 // A ping's ring fades in about a second, then its element goes.
-const PING_FRAMES = 9
+const PING_FRAMES = 18
 // homelab-stats rebuilds its answer every five minutes.
 const REFRESH_MS = 5 * 60_000
 // The count holds back its last attacks and adds them one at a time, like a live feed.
@@ -28,7 +28,7 @@ const HELD_BACK = 100
 const TRICKLE_MS = 750
 
 // Plain words for each kind of file homelab-stats sorts a request into.
-// Written to sit mid-sentence. The list capitalises the first letter in CSS.
+// Written in lower case. The list capitalises the first letter in CSS.
 const KINDS: Record<string, string> = {
   env: 'passwords in .env files',
   wordpress: 'WordPress logins',
@@ -38,6 +38,10 @@ const KINDS: Record<string, string> = {
   backup: 'database backups',
   other: 'other hidden files',
 }
+
+// Where the homelab sits, rounded to one decimal like every city on the map.
+// That is about 11 km, so the mark names a town and never a house.
+const HOME = project(40.5, -89.0)
 
 interface Ping {
   id: number
@@ -70,8 +74,13 @@ export class App {
   protected readonly pings = signal<Ping[]>([])
 
   protected readonly viewBox = `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`
+  // The one limit on the numbers a reader cannot see, said beside how fresh they are.
+  protected readonly source = ['US sources only']
   protected readonly land = LAND_PATH
   protected readonly borders = BORDERS_PATH
+  // The mark is drawn in a 64 unit box, then shrunk and centred on the spot.
+  protected readonly home =
+    HOME && `translate(${HOME.x.toFixed(1)} ${HOME.y.toFixed(1)}) scale(0.5) translate(-32 -32)`
 
   private readonly buckets = computed(() => this.data()?.timestamps.length ?? 0)
 
@@ -87,16 +96,16 @@ export class App {
     return n < 2 ? 0 : (Math.max(this.playhead(), 0) / (n - 1)) * 100
   })
 
-  // The day and hour under the playhead. Buckets are 12 hours, so the hour says which half of the day.
+  // The day under the playhead while the 30 days play. At rest, both ends of the range.
   protected readonly day = computed(() => {
-    const seconds = this.data()?.timestamps[this.playhead()]
-    return seconds === undefined
-      ? ''
-      : new Date(seconds * 1000).toLocaleString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          hour: 'numeric',
-        })
+    const times = this.data()?.timestamps ?? []
+    const at = times[this.playhead()]
+    if (at === undefined) return ''
+    const date = (seconds: number, month: 'long' | 'short') =>
+      new Date(seconds * 1000).toLocaleDateString('en-US', { month, day: 'numeric' })
+    return this.shown() < times.length
+      ? date(at, 'long')
+      : `${date(times[0], 'short')} to ${date(at, 'short')}`
   })
 
   // Each place with its running total after every bucket.
@@ -109,14 +118,16 @@ export class App {
       const at = project(p.lat, p.lon)
       if (!at) return []
       const upTo = runningTotal(n, p.hits)
-      return [{ city: p.city, region: p.region, x: at.x, y: at.y, upTo, total: upTo[n] }]
+      const edge = p.edge === true
+      const name = edge ? `Cloudflare in ${p.city}, ${p.region}` : `${p.city}, ${p.region}`
+      return [{ name, edge, x: at.x, y: at.y, upTo, total: upTo[n] }]
     })
     const peak = Math.max(...places.map((p) => p.total), 1)
     return places
       .map((p) => ({
         ...p,
-        // Area grows with the count, so one busy city cannot cover the map.
-        radius: (count: number) => 5 + 22 * Math.sqrt(count / peak),
+        // Area grows with the count, kept small so one busy place cannot cover its neighbours.
+        radius: (count: number) => 4 + 12 * Math.sqrt(count / peak),
       }))
       .sort((a, b) => b.total - a.total)
   })
@@ -137,12 +148,14 @@ export class App {
           day: 'numeric',
         })
         const share = Math.round((count / all) * 100)
+        const what = p.edge ? 'stopped here' : count === 1 ? 'attack' : 'attacks'
         return {
-          name: `${p.city}, ${p.region}`,
+          name: p.name,
+          edge: p.edge,
           x: p.x,
           y: p.y,
           r: p.radius(count),
-          detail: `${count.toLocaleString('en-US')} ${count === 1 ? 'attack' : 'attacks'} · ${share < 1 ? 'under 1' : share}% of all · last on ${day}`,
+          detail: `${count.toLocaleString('en-US')} ${what} · ${share < 1 ? 'under 1' : share}% of all · last on ${day}`,
         }
       })
   })
@@ -151,8 +164,11 @@ export class App {
   protected readonly hovered = signal<{ name: string; left: number; top: number } | null>(null)
 
   // The label reads the dot's live numbers, so it keeps up while the count moves.
+  protected readonly homeName = "Matt's Homelab"
+
   protected readonly tip = computed(() => {
     const h = this.hovered()
+    if (h?.name === this.homeName) return { ...h, detail: '' }
     const dot = h && this.dots().find((d) => d.name === h.name)
     return h && dot ? { ...h, detail: dot.detail } : null
   })
@@ -166,24 +182,39 @@ export class App {
   // The five busiest cities, counting up with the first sweep.
   protected readonly worst = computed(() => {
     const f = this.shown()
+    // Data centres are where attacks were stopped, so they are not jerks.
     return this.placed()
+      .filter((p) => !p.edge)
       .slice(0, 5)
-      .map((p) => ({ name: `${p.city}, ${p.region}`, count: p.upTo[f] }))
+      .map((p) => ({ name: p.name, count: p.upTo[f] }))
   })
 
   // What they asked for, as a share of every attack. A kind this page has no words for is left out.
   protected readonly kinds = computed(() => {
     const d = this.data()
-    if (!d?.kinds || d.probes === 0) return []
+    // A share of the probes that reached the cluster. The edge blocks have no kind of file.
+    const total = d?.kinds?.reduce((sum, k) => sum + k.count, 0) ?? 0
+    if (!d?.kinds || total === 0) return []
     return d.kinds
       .filter((k) => KINDS[k.kind])
       .slice(0, 5)
       .map((k) => ({
         kind: k.kind,
         label: KINDS[k.kind],
-        share: Math.round((k.count / d.probes) * 100),
+        share: Math.round((k.count / total) * 100),
       }))
   })
+
+  // The big number split by where each attack ended.
+  // Null with no count from Cloudflare. The map then has no rings to explain.
+  protected readonly split = computed(() => {
+    const d = this.data()
+    const edge = d?.walls?.find((w) => w.wall === 'waf')?.count
+    return d && edge ? { edge, reached: Math.max(0, d.probes - edge) } : null
+  })
+
+  // How many attacks each wall answered. Empty until the API sends it.
+  protected readonly walls = computed(() => this.data()?.walls ?? [])
 
   private readonly seriesUpTo = computed(() => {
     const d = this.data()
@@ -203,10 +234,13 @@ export class App {
     return Math.min(totals[this.shown()] ?? 0, totals[totals.length - 1] - this.owed())
   })
 
+  // Cities attacks came from. The data centres that stopped them are not counted.
+  protected readonly cities = computed(() => this.data()?.places.filter((p) => !p.edge).length ?? 0)
+
   protected readonly summary = computed(() => {
     const d = this.data()
     if (!d) return 'Map of the US cities that scanner requests came from'
-    return `Map of the ${this.placed().length} US cities that sent ${d.probes.toLocaleString('en-US')} scanner requests in the last 30 days`
+    return `Map of the ${this.cities()} US cities that sent attacks in the last 30 days, and the Cloudflare data centres that stopped some of them`
   })
 
   private fetched = 0
@@ -296,7 +330,7 @@ export class App {
       const { data, at } = await this.stats.attacks()
       const first = this.data() === null
       const shownBefore = first ? data.probes : this.count()
-      const totalsBefore = new Map(this.placed().map((p) => [p.city + p.region, p.total]))
+      const totalsBefore = new Map(this.placed().map((p) => [p.name, p.total]))
       this.data.set(data)
       this.updatedAt.set(at)
       this.failed.set(false)
@@ -304,7 +338,7 @@ export class App {
       this.owed.set(Math.min(HELD_BACK, Math.max(0, data.probes - shownBefore)))
       if (first) return
       const arrived = this.placed().flatMap((p) => {
-        const more = p.total - (totalsBefore.get(p.city + p.region) ?? 0)
+        const more = p.total - (totalsBefore.get(p.name) ?? 0)
         return more > 0 ? new Array<Point>(more).fill({ x: p.x, y: p.y, r: p.radius(p.total) }) : []
       })
       this.queue = shuffle(arrived).slice(0, this.owed())

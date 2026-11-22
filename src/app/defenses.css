@@ -3,110 +3,104 @@
   padding: 0 max(22px, 4vw) 96px;
 }
 
-/* As wide as the two cards above it.
+/* As wide as the two cards above it, with the same rows.
    The six walls sit beside the rings that draw them, and the rings get the wider side.
-   The three with no ring run along the bottom. */
+   The two 1fr rows share the spare height, so the words stay centred on the rings. */
 .card {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
   grid-template-areas:
     'head rings'
     'walls rings'
-    'around around';
-  grid-template-rows: auto 1fr auto;
+    'plus rings';
+  grid-template-rows: 1fr auto 1fr;
   gap: 0 clamp(28px, 4vw, 56px);
-  align-items: start;
   max-width: 1020px;
   margin: 0 auto;
-  padding: clamp(28px, 3.4vw, 44px);
+  padding: clamp(22px, 2.4vw, 32px);
   border-radius: 28px;
   background: var(--card);
 }
 
-header {
-  grid-area: head;
-}
-
 h2 {
-  font-size: clamp(24px, 2.4vw, 32px);
+  grid-area: head;
+  align-self: end;
+  font-size: clamp(20px, 1.8vw, 26px);
   font-weight: 600;
   line-height: 1.12;
   letter-spacing: -0.02em;
 }
 
-header p {
-  margin-top: 10px;
-  font-size: 14px;
-  color: var(--ink-2);
-}
-
-.walls {
+ol {
   grid-area: walls;
-  margin-top: 24px;
-}
-
-.around {
-  grid-area: around;
-  margin-top: 36px;
-}
-
-ol,
-ul {
+  margin-top: 16px;
   list-style: none;
 }
 
 li {
-  display: grid;
-  grid-template-columns: 96px 1fr;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 16px;
-  padding: 11px 0;
+  padding: 9px 0;
   border-top: 1px solid var(--line);
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 15px;
 }
 
+/* One line: the job, then what does it in this cluster, small and grey. */
+li div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+}
+
+li small {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+/* One line, so a long tool name wraps under its job and the share stays put. */
 li b {
-  font-weight: 600;
-}
-
-li span {
+  flex: none;
+  font-weight: 400;
   color: var(--ink-2);
   transition: color 0.15s;
+}
+
+/* The row of the wall under the pointer reads at full strength. */
+li.on b {
+  color: var(--ink);
 }
 
 li.stop b {
   color: var(--accent);
 }
 
-/* The row of the wall under the pointer reads at full strength. */
-li.on span {
-  color: var(--ink);
+/* How many attacks this wall stopped. */
+li i {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
 }
 
-h3 {
-  font-size: 14px;
-  font-weight: 600;
+/* Its top line closes the list. */
+.plus {
+  grid-area: plus;
+  align-self: start;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
   color: var(--ink-2);
 }
 
-/* Three side by side, each with its name over what it does. */
-ul {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0 clamp(20px, 3vw, 40px);
-  margin-top: 10px;
-}
-
-ul li {
-  grid-template-columns: 1fr;
-  gap: 2px;
-}
-
+/* Capped, so this card stays close to the height of the two above it. */
 .rings {
   grid-area: rings;
   align-self: center;
+  justify-self: center;
   display: block;
   width: 100%;
+  max-width: 440px;
   height: auto;
 }
 
@@ -125,13 +119,16 @@ ul li {
   stroke: rgba(255, 255, 255, 0.1);
 }
 
+/* A wall that stopped attacks is red.
+   --heat is its share of them, so the busier wall is brighter. */
 .wall.stop {
   stroke: var(--accent);
   stroke-width: 2;
-  filter: drop-shadow(0 0 9px rgba(255, 55, 95, 0.7));
+  stroke-opacity: calc(0.6 + 0.4 * var(--heat));
+  filter: drop-shadow(0 0 9px rgb(255 55 95 / calc(0.3 + 0.4 * var(--heat))));
 }
 
-/* Drawing units. 17 comes out near 12px at the card's full width. */
+/* Drawing units. 17 comes out near 11px at the rings' full width. */
 text {
   font-size: 17px;
   fill: var(--ink-2);
@@ -173,7 +170,7 @@ text.on {
 /* A dot flies in along its lane, turns white where it is stopped, then fades. */
 .shot {
   fill: var(--accent);
-  animation: fly 1.2s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+  animation: fly 1s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
 }
 
 /* A ring spreads from the spot the dot was stopped at. */
@@ -184,10 +181,10 @@ text.on {
   vector-effect: non-scaling-stroke;
   transform-box: fill-box;
   transform-origin: center;
-  animation: spark 1.2s ease-out forwards;
+  animation: spark 1s ease-out forwards;
 }
 
-/* --stop is the radius of the ring the dots stop at. */
+/* --stop is the radius of the ring this dot stops at. */
 @keyframes fly {
   from {
     transform: translateX(335px);
@@ -231,16 +228,8 @@ text.on {
       'head'
       'rings'
       'walls'
-      'around';
-  }
-
-  ul {
-    grid-template-columns: 1fr;
-  }
-
-  ul li {
-    grid-template-columns: 96px 1fr;
-    gap: 16px;
+      'plus';
+    grid-template-rows: auto;
   }
 
   .rings {
@@ -252,7 +241,7 @@ text.on {
     display: none;
   }
 
-  .walls {
+  ol {
     margin-top: 12px;
   }
 }

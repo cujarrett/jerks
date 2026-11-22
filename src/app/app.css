@@ -9,6 +9,7 @@
   grid-template-columns: minmax(max-content, 0.5fr) minmax(0, 2fr);
   gap: 48px;
   align-items: center;
+  position: relative;
   min-height: 100dvh;
   padding: 40px max(22px, 4vw);
   /* A faint warm light behind the map. */
@@ -81,16 +82,6 @@ h1 {
   text-decoration-color: var(--ink);
 }
 
-/* One line tall even while empty, so the map never moves when it fills. */
-.most {
-  min-height: 1.4em;
-  margin-top: 22px;
-  font-size: 14px;
-  line-height: 1.4;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
 .stage {
   min-width: 0;
 }
@@ -133,6 +124,26 @@ h1 {
 
 .dots circle:hover {
   fill-opacity: 0.85;
+}
+
+/* A Cloudflare data centre is a thin ring, not a dot.
+   It marks where attacks were stopped, not where they came from. */
+.dots circle.edge {
+  fill-opacity: 0;
+  stroke: var(--accent);
+  stroke-opacity: 0.4;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.dots circle.edge:hover {
+  fill-opacity: 0.15;
+  stroke-opacity: 1;
+}
+
+/* Where the homelab sits. White, so it stands apart from the red attack dots. */
+.home .heart {
+  fill: var(--ink);
 }
 
 /* Sits just above the dot it describes. Fixed, because its place comes from the dot's box on screen. */
@@ -219,59 +230,100 @@ h1 {
   }
 }
 
-/* A hairline that fills as the 30 days play, then starts over. */
+/* A hairline that fills as the 30 days play. Grey, so it never pulls the eye from the map. */
 .scrubber {
-  height: 2px;
+  height: 1px;
   margin-top: 18px;
-  border-radius: 1px;
   background: var(--line);
 }
 
 .scrubber i {
   display: block;
   height: 100%;
-  border-radius: 1px;
-  background: var(--ink);
-  transition: width 0.14s linear;
+  background: rgba(255, 255, 255, 0.32);
+  transition: width 0.07s linear;
 }
 
 .under {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 16px;
+  gap: 6px 16px;
   margin-top: 10px;
   font-size: 12px;
   color: var(--ink-2);
 }
 
-.day {
+.edge-note {
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* One card or two, centred, each as wide as its neighbour. */
+/* One line, so a long source note beside it wraps and the date does not. */
+.day {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* A quiet arrow at the foot of the first screen, so the cards below it are no secret. */
+.cue {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  margin-left: -14px;
+  color: var(--ink-2);
+  animation: nudge 2.4s ease-in-out infinite;
+  transition: color 0.15s;
+}
+
+.cue:hover {
+  color: var(--ink);
+}
+
+.cue svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@keyframes nudge {
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+/* Up to three cards, each as wide as its neighbour.
+   Together they are as wide as the rings card under them. */
 .cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 500px));
-  justify-content: center;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
   gap: 20px;
-  padding: 24px max(22px, 4vw) 20px;
+  width: min(1020px, 100% - 2 * max(22px, 4vw));
+  margin: 24px auto 20px;
+  /* The arrow under the map stops with the line above the cards still in view. */
+  scroll-margin-top: 72px;
 }
 
 article {
-  padding: clamp(28px, 3.4vw, 44px);
+  padding: clamp(22px, 2.4vw, 32px);
   border-radius: 28px;
   background: var(--card);
 }
 
 h2 {
-  font-size: clamp(24px, 2.4vw, 32px);
+  font-size: clamp(20px, 1.8vw, 26px);
   font-weight: 600;
   line-height: 1.12;
   letter-spacing: -0.02em;
 }
 
 ol {
-  margin-top: 24px;
+  margin-top: 16px;
   list-style: none;
 }
 
@@ -279,12 +331,40 @@ li {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  padding: 13px 0;
+  padding: 9px 0;
   border-top: 1px solid var(--line);
-  font-size: 17px;
+  font-size: 15px;
 }
 
-/* The labels are written to sit mid-sentence, so the list gives them their capital. */
+/* A section title above the cards, sized and centred like the ones on mattjarrett.dev.
+   Its number is the pink of the big one, because it is a part of it. */
+.reach {
+  padding: 56px max(22px, 4vw) 8px;
+  font-size: clamp(26px, 2.6vw, 36px);
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.reach b {
+  color: var(--accent);
+}
+
+/* The mark as it is drawn on the map. */
+.key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+}
+
+/* Named apart from .ring, the ripple on the map, which fades out. */
+.edge-key {
+  border: 1px solid var(--accent);
+}
+
+/* The labels are written in lower case, so the list gives them their capital. */
 li span::first-letter {
   text-transform: uppercase;
 }
@@ -295,22 +375,25 @@ li b {
   font-variant-numeric: tabular-nums;
 }
 
+/* The same line as Launchpad's footer, in the accent pink of the big number. */
 footer {
-  max-width: 1040px;
-  margin: 0 auto;
-  padding: 18px max(22px, 4vw) 40px;
-  border-top: 1px solid var(--line);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-2);
+  padding: 0.9rem 1.5rem;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: var(--accent);
 }
 
 footer a {
-  color: var(--ink);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
 }
 
 footer a:hover {
-  text-decoration: underline;
+  color: var(--ink);
+  text-decoration: none;
 }
 
 @media (max-width: 900px) {
@@ -320,12 +403,18 @@ footer a:hover {
     align-content: center;
   }
 
+  /* A phone reader is scrolling already. */
+  .cue {
+    display: none;
+  }
+
   .figures {
     margin-top: 32px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cue,
   .dots circle,
   .flash,
   .ring {

@@ -19,21 +19,7 @@
             in the last 30 days
           </dt>
         </div>
-        <div>
-          <dd>{{ d ? (d.sources | number) : '–' }}</dd>
-          <dt>sources</dt>
-        </div>
-        <div>
-          <dd>{{ d ? (d.places.length | number) : '–' }}</dd>
-          <dt>cities</dt>
-        </div>
       </dl>
-      <!-- Always there, so the line under it does not arrive with a jump. -->
-      <p class="most">
-        @if (kinds()[0]; as top) {
-          Most often after {{ top.label }}.
-        }
-      </p>
     </div>
 
     <div class="stage">
@@ -44,6 +30,7 @@
           @for (d of dots(); track d.name) {
             <circle
               role="img"
+              [class.edge]="d.edge"
               [attr.aria-label]="d.name + ': ' + d.detail"
               [attr.cx]="d.x"
               [attr.cy]="d.y"
@@ -63,26 +50,64 @@
           />
           <circle class="ring" [attr.cx]="p.x" [attr.cy]="p.y" [attr.r]="p.r" />
         }
+        <!-- Drawn last, so no dot or flash covers it. -->
+        @if (home) {
+          <g
+            class="home"
+            role="img"
+            [attr.aria-label]="homeName"
+            [attr.transform]="home"
+            (pointerenter)="point(homeName, $event)"
+            (pointerleave)="hovered.set(null)"
+          >
+            <path
+              class="heart"
+              d="M32 47C20 39 15.5 32 15.5 26.5C15.5 21.5 19.5 18 24 18C27.5 18 30.5 20 32 23C33.5 20 36.5 18 40 18C44.5 18 48.5 21.5 48.5 26.5C48.5 32 44 39 32 47Z"
+            />
+          </g>
+        }
       </svg>
 
       <!-- Shown the moment the pointer is on a dot. The browser's own tooltip waits a second. -->
       @if (tip(); as t) {
         <div class="tip" aria-hidden="true" [style.left.px]="t.left" [style.top.px]="t.top">
           <b>{{ t.name }}</b>
-          <span>{{ t.detail }}</span>
+          @if (t.detail) {
+            <span>{{ t.detail }}</span>
+          }
         </div>
       }
 
       <div class="scrubber" aria-hidden="true"><i [style.width.%]="progress()"></i></div>
       <div class="under">
-        <app-live-source [updatedAt]="updatedAt()" [failed]="failed()" />
+        <app-live-source [updatedAt]="updatedAt()" [failed]="failed()" [details]="source" />
+        <!-- The key to the rings on the map, with the other half of the big number. -->
+        @if (split(); as s) {
+          <span class="edge-note"
+            ><i class="key edge-key" aria-hidden="true"></i>{{ s.edge | number }} stopped by
+            Cloudflare</span
+          >
+        }
         <span class="day">{{ day() }}</span>
       </div>
     </div>
+
+    @if (d) {
+      <a class="cue" href="#more" aria-label="More below">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9l7 7 7-7" /></svg>
+      </a>
+    }
   </section>
 
   @if (data()) {
-    <section class="cards">
+    <!-- The two cards cover only these attacks. Cloudflare names no city for the ones it stops.
+         It sits above the cards, so it never takes a column of their grid. -->
+    @if (split(); as s) {
+      <h2 class="reach">
+        Of the <b>{{ s.reached | number }}</b> that reached my homelab.
+      </h2>
+    }
+    <section class="cards" id="more">
       @if (kinds().length) {
         <article>
           <h2>What they wanted.</h2>
@@ -106,15 +131,13 @@
         </ol>
       </article>
     </section>
-    <app-defenses [hits]="pings()" />
+    <app-defenses [hits]="pings()" [stops]="walls()" />
   }
 
   <footer>
-    <p>
-      Read from the Traefik access logs on my bookshelf homelab. US sources only, shown by city.
-    </p>
     <a href="https://mattjarrett.dev/#homelab" target="_blank" rel="noopener noreferrer"
-      >mattjarrett.dev<span aria-hidden="true"> ↗</span></a
+      >Made by Matt Jarrett</a
     >
+    with ♥ and Kubernetes
   </footer>
 </main>
