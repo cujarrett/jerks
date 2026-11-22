@@ -51,6 +51,8 @@ interface Ping {
   // How hot the flash is, from 0.5 for one request to 1 for a thousand or more.
   heat: number
   born: number
+  // A Cloudflare data centre that stopped the request. The rings colour its dot apart.
+  edge: boolean
 }
 
 @Component({
@@ -80,7 +82,7 @@ export class App {
   protected readonly borders = BORDERS_PATH
   // The mark is drawn in a 64 unit box, then shrunk and centred on the spot.
   protected readonly home =
-    HOME && `translate(${HOME.x.toFixed(1)} ${HOME.y.toFixed(1)}) scale(0.5) translate(-32 -32)`
+    HOME && `translate(${HOME.x.toFixed(1)} ${HOME.y.toFixed(1)}) scale(0.35) translate(-32 -32)`
 
   private readonly buckets = computed(() => this.data()?.timestamps.length ?? 0)
 
@@ -180,13 +182,23 @@ export class App {
   }
 
   // The five busiest cities, counting up with the first sweep.
+  // A city's count holds back its own attacks still in the queue, so it ticks when its dot flashes.
   protected readonly worst = computed(() => {
     const f = this.shown()
+    const held = this.held().byName
     // Data centres are where attacks were stopped, so they are not jerks.
     return this.placed()
       .filter((p) => !p.edge)
       .slice(0, 5)
-      .map((p) => ({ name: p.name, count: p.upTo[f] }))
+      .map((p) => ({ name: p.name, count: Math.min(p.upTo[f], p.total - (held.get(p.name) ?? 0)) }))
+  })
+
+  // Every attack that reached the homelab and is not in the five rows above.
+  // Smaller cities, and requests with no location. With it the card always adds up to "reached".
+  protected readonly elsewhere = computed(() => {
+    const reached = this.reached()
+    if (!reached) return 0
+    return Math.max(0, reached.now - this.worst().reduce((sum, c) => sum + c.count, 0))
   })
 
   // What they asked for, as a share of every attack. A kind this page has no words for is left out.
@@ -205,18 +217,70 @@ export class App {
       }))
   })
 
+  // Attacks that reached the homelab, on the map so far. Null with no count from Cloudflare.
+  // total: the real count. now: what the page shows, which every number under the map is cut from.
+  // During the sweep, now follows the data: every city, and a share of the requests with no location.
+  // After it, now is the real count less the attacks still owed.
+  private readonly reached = computed(() => {
+    const d = this.data()
+    const waf = d?.walls?.find((w) => w.wall === 'waf')?.count
+    if (!d || !waf) return null
+    const total = d.probes - waf
+    const settled = Math.max(0, total - this.held().rest)
+    const f = this.shown()
+    const n = this.buckets()
+    if (f >= n) return { total, now: settled }
+    const places = this.placed()
+    const cities = places.filter((p) => !p.edge)
+    const sumAt = (list: typeof places, i: number) => list.reduce((sum, p) => sum + p.upTo[i], 0)
+    // Requests with no place on the map. Some reached the homelab, in the share the totals leave over.
+    const lost = (i: number) => this.seriesUpTo()[i] - sumAt(places, i)
+    const share = lost(n) > 0 ? Math.min(1, Math.max(0, total - sumAt(cities, n)) / lost(n)) : 0
+    return { total, now: Math.min(sumAt(cities, f) + Math.round(lost(f) * share), settled) }
+  })
+
   // The big number split by where each attack ended.
   // Null with no count from Cloudflare. The map then has no rings to explain.
-  // reached: holds back the same attacks the big number still owes, so the two tick up together
-  // and the page always adds up. It ends on the real count and never passes it.
+  // edge: what is left of the big number, so the two halves always add up to it.
   protected readonly split = computed(() => {
-    const d = this.data()
-    const edge = d?.walls?.find((w) => w.wall === 'waf')?.count
-    return d && edge ? { edge, reached: Math.max(0, d.probes - edge - this.owed()) } : null
+    const reached = this.reached()
+    return reached ? { edge: Math.max(0, this.count() - reached.now), reached: reached.now } : null
   })
 
   // How many attacks each wall answered. Empty until the API sends it.
   protected readonly walls = computed(() => this.data()?.walls ?? [])
+
+  // The count each wall's row shows, cut from the split above so the rows add up to it.
+  // waf: the Cloudflare half.
+  // web: what is left of "reached" after the other inner walls.
+  // Any other wall: its share of "reached" so far.
+  protected readonly wallsNow = computed(() => {
+    const split = this.split()
+    const reached = this.reached()
+    if (!split || !reached) return {}
+    const now: Record<string, number> = { waf: split.edge }
+    let others = 0
+    for (const w of this.walls()) {
+      if (w.wall === 'waf' || w.wall === 'web') continue
+      now[w.wall] = reached.total ? Math.round((w.count * split.reached) / reached.total) : 0
+      others += now[w.wall]
+    }
+    now['web'] = Math.max(0, split.reached - others)
+    return now
+  })
+
+  // The attacks still owed, by where each will land.
+  // edge: queued at a Cloudflare data centre. rest: every other one, placed or not.
+  // byName: queued per place, so a city's count waits for its own flash.
+  private readonly held = computed(() => {
+    const byName = new Map<string, number>()
+    let edge = 0
+    for (const p of this.queue()) {
+      byName.set(p.name, (byName.get(p.name) ?? 0) + 1)
+      if (p.edge) edge++
+    }
+    return { edge, rest: this.owed() - edge, byName }
+  })
 
   private readonly seriesUpTo = computed(() => {
     const d = this.data()
@@ -251,7 +315,7 @@ export class App {
   private frame = 0
   // The cities of the attacks still owed, in the order they will arrive.
   // Shorter than `owed` when some attacks had no location.
-  private queue: Point[] = []
+  private readonly queue = signal<Point[]>([])
   private timer: ReturnType<typeof setInterval> | undefined
 
   constructor() {
@@ -267,7 +331,7 @@ export class App {
       }
       const total = this.data()?.probes ?? 0
       this.owed.set(Math.min(HELD_BACK, Math.floor(total / 10)))
-      this.queue = this.newest(this.owed())
+      this.queue.set(this.newest(this.owed()))
       this.timer = setInterval(() => this.step(), FRAME_MS)
     })
   }
@@ -291,6 +355,7 @@ export class App {
           x: p.x,
           y: p.y,
           r: p.radius(p.upTo[i + 1]),
+          edge: p.edge,
           heat,
           born: now,
         })
@@ -299,7 +364,8 @@ export class App {
       // After the sweep. One attack arrives at a time, at uneven gaps, and only its city flashes.
       if (this.owed() > 0 && Math.random() < FRAME_MS / TRICKLE_MS) {
         this.owed.update((count) => count - 1)
-        const at = this.queue.shift()
+        const [at, ...later] = this.queue()
+        this.queue.set(later)
         if (at) born.push({ id: this.nextId++, ...at, heat: 0.85, born: now })
       }
       // A page left open stays live.
@@ -317,7 +383,7 @@ export class App {
     for (let b = this.buckets() - 1; b >= 0 && found.length < count; b--) {
       const bucket: Point[] = []
       for (const p of this.placed()) {
-        const at = { x: p.x, y: p.y, r: p.radius(p.total) }
+        const at = { name: p.name, x: p.x, y: p.y, r: p.radius(p.total), edge: p.edge }
         for (let k = p.upTo[b + 1] - p.upTo[b]; k > 0; k--) bucket.push(at)
       }
       // The API counts per 12 hours, so the order inside one bucket is made up.
@@ -341,9 +407,17 @@ export class App {
       if (first) return
       const arrived = this.placed().flatMap((p) => {
         const more = p.total - (totalsBefore.get(p.name) ?? 0)
-        return more > 0 ? new Array<Point>(more).fill({ x: p.x, y: p.y, r: p.radius(p.total) }) : []
+        return more > 0
+          ? new Array<Point>(more).fill({
+              name: p.name,
+              x: p.x,
+              y: p.y,
+              r: p.radius(p.total),
+              edge: p.edge,
+            })
+          : []
       })
-      this.queue = shuffle(arrived).slice(0, this.owed())
+      this.queue.set(shuffle(arrived).slice(0, this.owed()))
     } catch {
       this.failed.set(true)
     }
@@ -360,9 +434,11 @@ function runningTotal(buckets: number, hits: number[][]): number[] {
 
 // Where a flash goes on the map, and how big.
 interface Point {
+  name: string
   x: number
   y: number
   r: number
+  edge: boolean
 }
 
 function shuffle<T>(items: T[]): T[] {

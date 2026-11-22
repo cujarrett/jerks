@@ -38,10 +38,12 @@ const WALLS: { name: string; tool: string; r: number; key?: string; behind?: boo
 const STOP = 3
 
 // A flash on the map: its id and where its city sits.
+// edge: the flash came from a Cloudflare data centre, so the WAF stopped it.
 export interface Hit {
   id: number
   x: number
   y: number
+  edge?: boolean
 }
 
 // The rings play slower than the map, so a reader can follow each dot.
@@ -64,6 +66,9 @@ export class Defenses {
   readonly hits = input.required<Hit[]>()
   // How many attacks each wall answered, by the API's word for the wall.
   readonly stops = input<{ wall: string; count: number }[]>([])
+  // The count each row shows right now, by the same word. A wall missing here shows its real count.
+  // The rings and the dots keep to the real counts, so they hold still while the rows tick.
+  readonly shown = input<Record<string, number>>({})
 
   // The wall under the pointer, by name. Its ring and its row light up together.
   protected readonly active = signal<string | null>(null)
@@ -82,13 +87,15 @@ export class Defenses {
   // An API with no counts yet gives them all to the web server, with no number to show.
   protected readonly walls = computed(() => {
     const odds = this.odds()
+    const shown = this.shown()
     return WALLS.map((w, i) => {
       const counted = odds.find((o) => o.r === w.r)
       const share = odds.length ? (counted?.share ?? 0) : i === STOP ? 1 : 0
+      const count = counted && w.key ? (shown[w.key] ?? counted.count) : 0
       return {
         ...w,
         share,
-        count: counted && counted.count > 0 ? counted.count : null,
+        count: count > 0 ? count : null,
         // Only once the API's counts are in. Without them nothing is known about any wall.
         none: w.behind === true && odds.length > 0,
         // Walls no attack reached are drawn quieter.
@@ -99,11 +106,17 @@ export class Defenses {
     })
   })
 
-  // The API says how many attacks each wall answered, and not which ones.
-  // So the dots are dealt out in those shares by id, and a dot keeps its wall.
-  private stopFor(id: number): number {
-    let u = (id * 0.618034) % 1
-    for (const o of this.odds()) {
+  // A flash from a Cloudflare data centre stops at the WAF, once the API has counted it.
+  // For the rest the API says how many attacks each inner wall answered, and not which ones.
+  // So those dots are dealt out in the inner walls' shares by id, and a dot keeps its wall.
+  private stopFor(hit: Hit): number {
+    const waf = WALLS[0].r
+    const odds = this.odds()
+    if (hit.edge && odds.some((o) => o.r === waf)) return waf
+    const inner = odds.filter((o) => o.r !== waf)
+    const all = inner.reduce((sum, o) => sum + o.share, 0)
+    let u = ((hit.id * 0.618034) % 1) * all
+    for (const o of inner) {
       if (u < o.share) return o.r
       u -= o.share
     }
@@ -185,7 +198,8 @@ export class Defenses {
       return {
         key,
         turn: `rotate(${Math.round(bearing) + ((h.id % 7) - 3) * 2})`,
-        stopAt: this.stopFor(h.id),
+        stopAt: this.stopFor(h),
+        edge: h.edge === true,
       }
     }),
   )

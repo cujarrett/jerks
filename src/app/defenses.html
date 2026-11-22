@@ -27,8 +27,8 @@
     <g class="shots" aria-hidden="true">
       @for (s of shots(); track s.key) {
         <g [attr.transform]="s.turn" [style.--stop.px]="s.stopAt">
-          <circle class="shot" r="5" />
-          <circle class="spark" [attr.cx]="s.stopAt" r="5" />
+          <circle class="shot" [class.edge]="s.edge" r="5" />
+          <circle class="spark" [class.edge]="s.edge" [attr.cx]="s.stopAt" r="5" />
         </g>
       }
     </g>
@@ -49,7 +49,7 @@
           @if (w.count !== null) {
             <i>{{ w.count | number }}</i>
           } @else if (w.none) {
-            0 stopped here
+            <i class="zero">0</i>
           }
         </b>
       </li>

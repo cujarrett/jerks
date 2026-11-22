@@ -52,9 +52,11 @@
         }
         <!-- Drawn last, so no dot or flash covers it. -->
         @if (home) {
-          <g
+          <a
             class="home"
-            role="img"
+            href="https://blog.mattjarrett.dev/homelab/"
+            target="_blank"
+            rel="noopener noreferrer"
             [attr.aria-label]="homeName"
             [attr.transform]="home"
             (pointerenter)="point(homeName, $event)"
@@ -64,7 +66,7 @@
               class="heart"
               d="M32 47C20 39 15.5 32 15.5 26.5C15.5 21.5 19.5 18 24 18C27.5 18 30.5 20 32 23C33.5 20 36.5 18 40 18C44.5 18 48.5 21.5 48.5 26.5C48.5 32 44 39 32 47Z"
             />
-          </g>
+          </a>
         }
       </svg>
 
@@ -128,10 +130,15 @@
               <span>{{ c.name }}</span><b>{{ c.count | number }}</b>
             </li>
           }
+          @if (elsewhere(); as rest) {
+            <li>
+              <span>Everywhere else</span><b>{{ rest | number }}</b>
+            </li>
+          }
         </ol>
       </article>
     </section>
-    <app-defenses [hits]="pings()" [stops]="walls()" />
+    <app-defenses [hits]="pings()" [stops]="walls()" [shown]="wallsNow()" />
   }
 
   <footer>

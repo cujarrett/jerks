@@ -141,9 +141,9 @@ h1 {
   stroke-opacity: 1;
 }
 
-/* Where the homelab sits. White, so it stands apart from the red attack dots. */
+/* Where the homelab sits. Green like the live dot, so it stands apart from the red attack dots. */
 .home .heart {
-  fill: var(--ink);
+  fill: var(--good);
 }
 
 /* Sits just above the dot it describes. Fixed, because its place comes from the dot's box on screen. */

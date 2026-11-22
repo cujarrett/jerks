@@ -68,6 +68,9 @@ describe('App', () => {
     ])
     expect(el.querySelectorAll('circle.ring').length).toBe(0)
     expect(el.querySelector('.map .home')?.getAttribute('aria-label')).toBe("Matt's Homelab")
+    expect(el.querySelector('.map .home')?.getAttribute('href')).toBe(
+      'https://blog.mattjarrett.dev/homelab/',
+    )
   })
 
   it('plays the dots in once, then moves the map only when the number moves', async () => {
@@ -153,6 +156,103 @@ describe('App', () => {
     expect(el.querySelectorAll('.figures dd').length).toBe(1)
     expect(el.querySelector('.cue')?.getAttribute('href')).toBe('#more')
     expect(el.querySelector('#more')).not.toBeNull()
+  })
+
+  it('keeps the wall rows adding up to the reached count while attacks are held back', async () => {
+    motion(false)
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    served = {
+      ...attacks,
+      walls: [
+        { wall: 'waf', count: 4 },
+        { wall: 'web', count: 7 },
+        { wall: 'gateway', count: 1 },
+      ],
+    }
+    const fixture = await mount()
+    const el = fixture.nativeElement as HTMLElement
+    const row = (name: string) =>
+      Number(
+        [...el.querySelectorAll('app-defenses li')]
+          .find((li) => li.querySelector('span')?.textContent === name)
+          ?.querySelector('b i')?.textContent ?? 0,
+      )
+    const sums = () => {
+      fixture.detectChanges()
+      return {
+        reached: Number(el.querySelector('.reach b')?.textContent),
+        rows: row('Gateway') + row('Web server'),
+      }
+    }
+    const boston = () =>
+      [...el.querySelectorAll('article')]
+        .find((a) => a.querySelector('h2')?.textContent === 'Biggest jerks.')
+        ?.querySelector('li b')?.textContent
+    // The rows climb with the sweep and add up to "reached" on every frame of it.
+    for (let frame = 0; frame < 3; frame++) {
+      const now = sums()
+      expect(now.rows).toBe(now.reached)
+      vi.advanceTimersByTime(70)
+    }
+    // The sweep ends. The newest attack is Boston's, so Boston still waits for it.
+    expect(sums()).toEqual({ reached: 7, rows: 7 })
+    expect(boston()).toBe('8')
+    // It arrives, and every number that counts it ticks together.
+    vi.advanceTimersByTime(70)
+    expect(sums()).toEqual({ reached: 8, rows: 8 })
+    expect(boston()).toBe('9')
+  })
+
+  it('adds the jerks card up to the reached count, with a row for everywhere else', async () => {
+    motion(false)
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    // Four more requests, all stopped at a Cloudflare data centre.
+    served = {
+      ...attacks,
+      probes: 16,
+      series: [3, 0, 13],
+      places: [
+        ...attacks.places,
+        { city: 'Ashburn', region: 'VA', lat: 39, lon: -77.5, edge: true, hits: [[2, 4]] },
+      ],
+      walls: [
+        { wall: 'waf', count: 4 },
+        { wall: 'web', count: 11 },
+        { wall: 'gateway', count: 1 },
+      ],
+    }
+    const fixture = await mount()
+    const el = fixture.nativeElement as HTMLElement
+    const read = () => {
+      fixture.detectChanges()
+      const rows = [
+        ...([...el.querySelectorAll('article')]
+          .find((a) => a.querySelector('h2')?.textContent === 'Biggest jerks.')
+          ?.querySelectorAll('li') ?? []),
+      ].map((li) => [
+        li.querySelector('span')?.textContent,
+        Number(li.querySelector('b')?.textContent),
+      ])
+      return {
+        last: rows.at(-1)?.[0],
+        card: rows.reduce((sum, row) => sum + (row[1] as number), 0),
+        reached: Number(el.querySelector('.reach b')?.textContent),
+        big: Number(el.querySelector('.figures .main dd')?.textContent),
+        edge: Number(el.querySelector('.edge-note')?.textContent?.replace(/\D/g, '')),
+      }
+    }
+    // Through the sweep and the one held-back attack after it, every frame adds up.
+    for (let frame = 0; frame < 5; frame++) {
+      const now = read()
+      expect(now.card).toBe(now.reached)
+      expect(now.big).toBe(now.edge + now.reached)
+      vi.advanceTimersByTime(70)
+    }
+    // One request has no city, so it is the row for everywhere else.
+    expect(read().last).toBe('Everywhere else')
+    expect(read()).toMatchObject({ big: 16, edge: 4, reached: 12, card: 12 })
   })
 
   it('keys the rings under the map, and says the cards cover only what reached my homelab', async () => {

@@ -128,6 +128,28 @@ describe('Defenses', () => {
     expect(turns).toEqual(['rotate(0)', 'rotate(180)'])
   })
 
+  it('stops a Cloudflare data centre dot at the WAF, in its own colour', async () => {
+    const el = await mount(
+      [
+        { id: 0, x: 0, y: 0, edge: true },
+        { id: 1, x: 0, y: 0 },
+      ],
+      [
+        { wall: 'waf', count: 70 },
+        { wall: 'web', count: 30 },
+      ],
+    )
+    const dots = [...el.querySelectorAll('g.shots > g')].map((g) => ({
+      edge: g.querySelector('circle.shot')?.classList.contains('edge'),
+      stopAt: g.querySelector('circle.spark')?.getAttribute('cx'),
+    }))
+    // The city dot never stops at the WAF, however large the WAF's share.
+    expect(dots).toEqual([
+      { edge: true, stopAt: '290' },
+      { edge: false, stopAt: '146' },
+    ])
+  })
+
   it('stops the dots at each wall in the shares the API counted', async () => {
     const hits = Array.from({ length: 200 }, (_, id) => ({ id, x: 0, y: 0 }))
     const stoppedAt = (el: HTMLElement) => {
@@ -159,6 +181,6 @@ describe('Defenses', () => {
     // The counted walls answered every attack, so the mesh behind them stopped none.
     // The container is not behind them, because the web server runs inside it.
     const quiet = [...el.querySelectorAll('ol li:not(.stop) b')].map((b) => b.textContent?.trim())
-    expect(quiet).toEqual(['', '', '0 stopped here', ''])
+    expect(quiet).toEqual(['', '', '0', ''])
   })
 })
