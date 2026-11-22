@@ -6,7 +6,7 @@ import { MAP_HEIGHT, MAP_WIDTH } from './us-map'
 const WALLS = [
   { name: 'Cloudflare', does: 'Turns known bots away at the edge.', r: 290 },
   { name: 'Tunnel', does: 'The only way in. The router has no open ports.', r: 242 },
-  { name: 'Traefik', does: 'Refuses any visitor past 300 requests a minute.', r: 194 },
+  { name: 'Traefik', does: 'Rate limits every visitor.', r: 194 },
   {
     name: 'Web server',
     does: 'Answers “not found” for files no visitor asks for. The attacks stop here.',
