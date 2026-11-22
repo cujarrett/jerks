@@ -10,6 +10,7 @@ import {
 } from '@angular/core'
 import { DOCUMENT, DecimalPipe, isPlatformBrowser } from '@angular/common'
 import { AttackStats, Stats } from './stats'
+import { Defenses } from './defenses'
 import { LiveSource } from './live-source'
 import { BORDERS_PATH, LAND_PATH, MAP_HEIGHT, MAP_WIDTH, project } from './us-map'
 
@@ -50,7 +51,7 @@ interface Ping {
 
 @Component({
   selector: 'app-root',
-  imports: [DecimalPipe, LiveSource],
+  imports: [DecimalPipe, Defenses, LiveSource],
   templateUrl: './app.html',
   styleUrl: './app.css',
   changeDetection: ChangeDetectionStrategy.OnPush,

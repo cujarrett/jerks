@@ -254,7 +254,7 @@ h1 {
   grid-template-columns: repeat(auto-fit, minmax(0, 500px));
   justify-content: center;
   gap: 20px;
-  padding: 24px max(22px, 4vw) 96px;
+  padding: 24px max(22px, 4vw) 20px;
 }
 
 article {

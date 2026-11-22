@@ -1,0 +1,265 @@
+:host {
+  display: block;
+  padding: 0 max(22px, 4vw) 96px;
+}
+
+/* As wide as the two cards above it.
+   The six walls sit beside the rings that draw them, and the rings get the wider side.
+   The three with no ring run along the bottom. */
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  grid-template-areas:
+    'head rings'
+    'walls rings'
+    'around around';
+  grid-template-rows: auto 1fr auto;
+  gap: 0 clamp(28px, 4vw, 56px);
+  align-items: start;
+  max-width: 1020px;
+  margin: 0 auto;
+  padding: clamp(28px, 3.4vw, 44px);
+  border-radius: 28px;
+  background: var(--card);
+}
+
+header {
+  grid-area: head;
+}
+
+h2 {
+  font-size: clamp(24px, 2.4vw, 32px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+header p {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.walls {
+  grid-area: walls;
+  margin-top: 24px;
+}
+
+.around {
+  grid-area: around;
+  margin-top: 36px;
+}
+
+ol,
+ul {
+  list-style: none;
+}
+
+li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+li b {
+  font-weight: 600;
+}
+
+li span {
+  color: var(--ink-2);
+  transition: color 0.15s;
+}
+
+li.stop b {
+  color: var(--accent);
+}
+
+/* The row of the wall under the pointer reads at full strength. */
+li.on span {
+  color: var(--ink);
+}
+
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+/* Three side by side, each with its name over what it does. */
+ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0 clamp(20px, 3vw, 40px);
+  margin-top: 10px;
+}
+
+ul li {
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.rings {
+  grid-area: rings;
+  align-self: center;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Each ring adds a little light, so the middle reads as the most covered. */
+.wall {
+  fill: rgba(255, 255, 255, 0.022);
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke 0.15s,
+    opacity 0.15s;
+}
+
+.wall.calm {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.wall.stop {
+  stroke: var(--accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 9px rgba(255, 55, 95, 0.7));
+}
+
+/* Drawing units. 17 comes out near 12px at the card's full width. */
+text {
+  font-size: 17px;
+  fill: var(--ink-2);
+  text-anchor: middle;
+  pointer-events: none;
+  transition:
+    fill 0.15s,
+    opacity 0.15s;
+}
+
+text.stop {
+  fill: var(--ink);
+}
+
+/* Pointing at a ring or its row lights that wall and dims the rest. */
+.wall.on {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+}
+
+.wall.stop.on {
+  stroke: var(--accent);
+  stroke-width: 3.5;
+}
+
+text.on {
+  fill: var(--ink);
+}
+
+.focus .wall:not(.on),
+.focus text:not(.on) {
+  opacity: 0.45;
+}
+
+.shots {
+  pointer-events: none;
+}
+
+/* A dot flies in along its lane, turns white where it is stopped, then fades. */
+.shot {
+  fill: var(--accent);
+  animation: fly 1.2s cubic-bezier(0.5, 0, 0.9, 0.6) forwards;
+}
+
+/* A ring spreads from the spot the dot was stopped at. */
+.spark {
+  fill: none;
+  stroke: #ff8fa3;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spark 1.2s ease-out forwards;
+}
+
+/* --stop is the radius of the ring the dots stop at. */
+@keyframes fly {
+  from {
+    transform: translateX(335px);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  55% {
+    transform: translateX(var(--stop));
+    fill: #fff5f6;
+    opacity: 1;
+  }
+  to {
+    transform: translateX(var(--stop));
+    fill: var(--accent);
+    opacity: 0;
+  }
+}
+
+@keyframes spark {
+  0%,
+  54% {
+    transform: scale(1);
+    opacity: 0;
+  }
+  55% {
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* One column, with the rings between the heading and the list. Ring names are in the list. */
+@media (max-width: 760px) {
+  .card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'head'
+      'rings'
+      'walls'
+      'around';
+  }
+
+  ul {
+    grid-template-columns: 1fr;
+  }
+
+  ul li {
+    grid-template-columns: 96px 1fr;
+    gap: 16px;
+  }
+
+  .rings {
+    max-width: 420px;
+    margin: 20px auto 0;
+  }
+
+  text {
+    display: none;
+  }
+
+  .walls {
+    margin-top: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shot,
+  .spark {
+    display: none;
+  }
+}

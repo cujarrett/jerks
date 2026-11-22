@@ -1,0 +1,64 @@
+<section class="card">
+  <header>
+    <h2>What stopped them.</h2>
+    <p>Each dot is an attack from the map. It asks a web server for a file and gets nothing.</p>
+  </header>
+
+  <svg
+    class="rings"
+    viewBox="-340 -340 680 680"
+    role="img"
+    aria-label="Six rings of defense around the pod. The attacks stop at the fourth, the web server."
+    [class.focus]="active()"
+    [style.--stop.px]="stopAt"
+  >
+    @for (w of walls; track w.name) {
+      <circle
+        class="wall"
+        [class.stop]="w.stop"
+        [class.calm]="w.calm"
+        [class.on]="active() === w.name"
+        [attr.r]="w.r"
+        (pointerenter)="active.set(w.name)"
+        (pointerleave)="active.set(null)"
+      />
+      <text [class.stop]="w.stop" [class.on]="active() === w.name" [attr.y]="w.labelY">
+        {{ w.name }}
+      </text>
+    }
+    <g class="shots" aria-hidden="true">
+      @for (s of shots(); track s.id) {
+        <g [attr.transform]="s.turn">
+          <circle class="shot" r="5" />
+          <circle class="spark" [attr.cx]="stopAt" r="5" />
+        </g>
+      }
+    </g>
+  </svg>
+
+  <ol class="walls">
+    @for (w of walls; track w.name) {
+      <li
+        [class.stop]="w.stop"
+        [class.on]="active() === w.name"
+        (pointerenter)="active.set(w.name)"
+        (pointerleave)="active.set(null)"
+      >
+        <b>{{ w.name }}</b>
+        <span>{{ w.does }}</span>
+      </li>
+    }
+  </ol>
+
+  <div class="around">
+    <h3>Around all of it.</h3>
+    <ul>
+      @for (a of around; track a.name) {
+        <li>
+          <b>{{ a.name }}</b>
+          <span>{{ a.does }}</span>
+        </li>
+      }
+    </ul>
+  </div>
+</section>
