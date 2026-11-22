@@ -207,10 +207,12 @@ export class App {
 
   // The big number split by where each attack ended.
   // Null with no count from Cloudflare. The map then has no rings to explain.
+  // reached: holds back the same attacks the big number still owes, so the two tick up together
+  // and the page always adds up. It ends on the real count and never passes it.
   protected readonly split = computed(() => {
     const d = this.data()
     const edge = d?.walls?.find((w) => w.wall === 'waf')?.count
-    return d && edge ? { edge, reached: Math.max(0, d.probes - edge) } : null
+    return d && edge ? { edge, reached: Math.max(0, d.probes - edge - this.owed()) } : null
   })
 
   // How many attacks each wall answered. Empty until the API sends it.

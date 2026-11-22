@@ -200,15 +200,15 @@ describe('App', () => {
     expect(el.querySelector('.tip span')).toBeNull()
   })
 
-  it('has no controls, and links back to the homelab it watches', async () => {
+  it("has no controls, and links the maker's name to his site", async () => {
     motion(true)
     const el = (await mount()).nativeElement as HTMLElement
     expect(el.querySelectorAll('button').length).toBe(0)
     expect(el.querySelector('footer')?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
       'Made by Matt Jarrett with ♥ and Kubernetes',
     )
-    expect(el.querySelector('footer a')?.getAttribute('href')).toBe(
-      'https://mattjarrett.dev/#homelab',
-    )
+    // Only the name is the link.
+    expect(el.querySelector('footer a')?.textContent).toBe('Matt Jarrett')
+    expect(el.querySelector('footer a')?.getAttribute('href')).toBe('https://mattjarrett.dev')
   })
 })
