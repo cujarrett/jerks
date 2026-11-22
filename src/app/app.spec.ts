@@ -269,6 +269,13 @@ describe('App', () => {
     expect(text('.reach')).toBe('Of the 8 that reached my homelab.')
   })
 
+  it('says in three steps how the data is collected, counted and drawn', async () => {
+    motion(true)
+    const el = (await mount()).nativeElement as HTMLElement
+    const steps = [...el.querySelectorAll('.how li b')].map((b) => b.textContent)
+    expect(steps).toEqual(['Collect', 'Count', 'Draw'])
+  })
+
   it('still works with an API that sends no kinds yet', async () => {
     motion(true)
     served = { ...attacks, kinds: undefined }

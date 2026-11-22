@@ -141,6 +141,26 @@
     <app-defenses [hits]="pings()" [stops]="walls()" [shown]="wallsNow()" />
   }
 
+  <section class="how">
+    <h2>How it works.</h2>
+    <ol>
+      <li>
+        <b>Collect</b>
+        <p>
+          Traefik logs every request. Alloy ships the logs to Loki, US only, with addresses hashed.
+        </p>
+      </li>
+      <li>
+        <b>Count</b>
+        <p>A small Go API asks Loki and Cloudflare's analytics every five minutes.</p>
+      </li>
+      <li>
+        <b>Draw</b>
+        <p>This page plays the last 30 days, then adds each new attack as it lands.</p>
+      </li>
+    </ol>
+  </section>
+
   <footer>
     Made by
     <a href="https://mattjarrett.dev" target="_blank" rel="noopener noreferrer">Matt Jarrett</a>

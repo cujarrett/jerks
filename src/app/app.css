@@ -376,6 +376,39 @@ li b {
 }
 
 /* The same line as Launchpad's footer, in the accent pink of the big number. */
+/* Three short steps in a row, as wide as the cards. No card behind them, so they read as a note. */
+.how {
+  width: min(1020px, 100% - 2 * max(22px, 4vw));
+  margin: 0 auto 72px;
+}
+
+.how ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 28px;
+  margin-top: 20px;
+  list-style: none;
+}
+
+/* Undo the card list rows, which are flex lines with a rule on top. */
+.how li {
+  display: block;
+  padding: 0;
+  border: 0;
+}
+
+.how b {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.how p {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
 footer {
   padding: 0.9rem 1.5rem;
   font-size: 1rem;
